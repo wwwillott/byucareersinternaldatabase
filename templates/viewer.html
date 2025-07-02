@@ -6,7 +6,8 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>{{ table_name }} Table Viewer</h2>
     <div>
-      <a class="btn btn-primary me-2" href="/editor/{{ table_name }}">Add a Row</a>
+      <a href="/editor_wizard/{{ table_name }}" class="btn btn-primary me-2">Add Row (Step-by-Step, Beginner-Friendly)</a>
+      <a href="/editor/{{ table_name }}" class="btn btn-secondary">Add Row (Basic Form, No Explanations)</a>
       <button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#columnDrawer" aria-expanded="false" aria-controls="columnDrawer">
         Filter Columns
       </button>
@@ -50,5 +51,97 @@
       </tbody>
     </table>
   </div>
+
+  <button id="downloadExcel" class="btn btn-outline-success mb-3 ms-2">Download Excel</button>
+
+  <button id="downloadCSV" class="btn btn-outline-primary mb-3">Download CSV</button>
+
 {% endblock %}
 
+{% block scripts %}
+<script>
+document.getElementById('downloadCSV')?.addEventListener('click', () => {
+  const table = document.querySelector('table');
+  if (!table) return;
+
+  let csv = [];
+
+  // Get headers
+  const headers = Array.from(table.querySelectorAll('thead th'))
+    .map(th => `"${th.textContent.trim()}"`);
+  csv.push(headers.join(','));
+
+  // Get only visible rows
+  const visibleRows = Array.from(table.querySelectorAll('tbody tr'))
+    .filter(row => row.offsetParent !== null);
+
+  for (const row of visibleRows) {
+    const cells = Array.from(row.querySelectorAll('td'))
+      .map(td => `"${td.textContent.trim().replace(/\n/g, ' ').replace(/"/g, '""')}"`);
+    csv.push(cells.join(','));
+  }
+
+  const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = '{{ table_name }}_results.csv';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+});
+document.addEventListener('DOMContentLoaded', function () {
+  const excelBtn = document.getElementById('downloadExcel');
+  if (!excelBtn) return;
+
+  excelBtn.addEventListener('click', () => {
+    const table = document.querySelector('table');
+    if (!table) return;
+
+    // Grab headers and rows of visible table data
+    const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
+    const visibleRows = Array.from(table.querySelectorAll('tbody tr'))
+      .filter(row => row.offsetParent !== null)
+      .map(row => Array.from(row.querySelectorAll('td')).map(td => td.textContent.trim()));
+
+    // Combine headers + data
+    const data = [headers, ...visibleRows];
+
+    // Create worksheet and workbook
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+
+    // Styling header row: bold font + fill color
+    const range = XLSX.utils.decode_range(worksheet['!ref']);
+    for(let C = range.s.c; C <= range.e.c; ++C) {
+      const cellAddress = XLSX.utils.encode_cell({r:0, c:C});
+      if(!worksheet[cellAddress]) continue;
+
+      worksheet[cellAddress].s = {
+        font: { bold: true, color: { rgb: "FFFFFFFF" } },
+        fill: { fgColor: { rgb: "FF4F81BD" } }, // blue fill
+        alignment: { horizontal: "center", vertical: "center" }
+      };
+    }
+
+    // Auto-width columns based on max cell length in each column
+    const colWidths = headers.map((_, colIndex) => {
+      let maxLength = headers[colIndex].length;
+      visibleRows.forEach(row => {
+        if(row[colIndex] && row[colIndex].length > maxLength) maxLength = row[colIndex].length;
+      });
+      return { wch: maxLength + 2 };
+    });
+    worksheet['!cols'] = colWidths;
+
+    // Freeze top header row
+    worksheet['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+    // Create workbook & add worksheet
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "{{ table_name }}");
+
+    // Write file
+    XLSX.writeFile(workbook, "{{ table_name }}_results.xlsx");
+  });
+});
+</script>
+{% endblock %}

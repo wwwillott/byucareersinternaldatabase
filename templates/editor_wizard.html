@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Add Row - {{ table_name }} (Step-by-Step){% endblock %}
+
+{% block content %}
+<h2>Add Row to {{ table_name }} (Step-by-Step)</h2>
+
+<form id="multiStepForm" action="/add_row/{{ table_name }}" method="POST">
+  <div id="inputCarousel" class="carousel slide" data-bs-interval="false" data-bs-wrap="false" data-bs-touch="true">
+    <div class="carousel-inner">
+      {% for column in columns %}
+      <div class="carousel-item {% if loop.first %}active{% endif %}">
+        <div class="mb-3">
+          <label for="input_{{ column }}" class="form-label">{{ column }}</label>
+          <small class="form-text text-muted">
+            {% if column_descriptions[column] %}
+              {{ column_descriptions[column] }}
+            {% else %}
+              Please enter {{ column }}.
+            {% endif %}
+          </small>
+
+          {% if column in dropdown_options %}
+          <!-- Dropdown -->
+          <select class="form-select mt-2" id="input_{{ column }}" name="column_{{ column }}" required>
+            <option value="">Select {{ column }}</option>
+            {% for option in dropdown_options[column] %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <!-- Text input -->
+          <input type="text" class="form-control mt-2" id="input_{{ column }}" name="column_{{ column }}" required>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Controls -->
+    <button type="button" class="btn btn-secondary" id="prevBtn">Previous</button>
+    <button type="button" class="btn btn-primary" id="nextBtn">Next</button>
+    <button type="submit" class="btn btn-success d-none" id="submitBtn">Submit</button>
+  </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const carousel = document.querySelector('#inputCarousel');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const submitBtn = document.getElementById('submitBtn');
+  const carouselInstance = bootstrap.Carousel.getOrCreateInstance(carousel);
+
+  function updateButtons() {
+    const items = carousel.querySelectorAll('.carousel-item');
+    const activeIndex = Array.from(items).findIndex(item => item.classList.contains('active'));
+    const lastIndex = items.length - 1;
+
+    prevBtn.style.display = activeIndex === 0 ? 'none' : 'inline-block';
+    nextBtn.style.display = activeIndex === lastIndex ? 'none' : 'inline-block';
+    submitBtn.classList.toggle('d-none', activeIndex !== lastIndex);
+  }
+
+  prevBtn.addEventListener('click', () => {
+    carouselInstance.prev();
+    setTimeout(updateButtons, 10);
+  });
+
+  nextBtn.addEventListener('click', () => {
+    carouselInstance.next();
+    setTimeout(updateButtons, 10);
+  });
+
+  // New function to update required attributes on inputs based on active slide
+  function updateRequiredAttributes() {
+    const items = carousel.querySelectorAll('.carousel-item');
+    items.forEach(item => {
+      const inputs = item.querySelectorAll('input[required], select[required], textarea[required]');
+      if (item.classList.contains('active')) {
+        inputs.forEach(input => input.setAttribute('required', ''));
+      } else {
+        inputs.forEach(input => input.removeAttribute('required'));
+      }
+    });
+  }
+
+  // Call on page load and on carousel slide change
+  updateButtons();
+  updateRequiredAttributes();
+
+  carousel.addEventListener('slid.bs.carousel', () => {
+    updateButtons();
+    updateRequiredAttributes();
+  });
+});
+</script>
+{% endblock %}

@@ -48,9 +48,9 @@ def add_row(table_name):
     values = []
 
     for key, value in request.form.items():
-        if key.startswith("column_") and value.strip():
-            column = key.replace("column_", "")
-            columns.append(column)
+        if key.startswith("column_") and value.strip() != '':
+            column_name = key.replace("column_", "")
+            columns.append(column_name)
             values.append(value.strip())
 
     if columns:
@@ -62,6 +62,40 @@ def add_row(table_name):
 
     conn.close()
     return redirect(f'/view/{table_name}')
+
+@app.route('/editor_wizard/<table_name>')
+def editor_wizard(table_name):
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    if table_name not in allowed_tables:
+        return "Table not found", 404
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_NAME = %s
+        ORDER BY ORDINAL_POSITION
+    """, (table_name,))
+    columns = [row[0] for row in cursor.fetchall()]
+    conn.close()
+
+    column_descriptions = {
+        'EventID': 'To get the ID, go to the Info Session on Handshake and copy the number from the URL.',
+        'EmployerID': 'To get the ID, go to the Employer on Handshake and copy the number from the URL.',
+        'InterviewID': 'To get the ID, go to the Interview on Handshake and copy the number from the URL.'
+    }
+
+    dropdown_options = {
+        'RoomType': ['Pre-Select', 'Room Only'],
+        'Weekday': ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    }
+
+    return render_template('editor_wizard.html',
+                           table_name=table_name,
+                           columns=columns,
+                           column_descriptions=column_descriptions,
+                           dropdown_options=dropdown_options)
 
 
 @app.route('/view/<table_name>', methods=['GET', 'POST'])
