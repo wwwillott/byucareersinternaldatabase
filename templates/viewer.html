@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Viewer</title>
+  <style>
+    table, th, td {
+      border: 1px solid black;
+      border-collapse: collapse;
+      padding: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Employer Table Viewer</h1>
+  <a href="/editor">Add a Row</a>
+  <br><br>
+
+  <table>
+    <thead>
+        <tr>
+            {% for column in columns %}
+            <th>{{ column }}</th>
+            {% endfor %}
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+            <tr>
+            {% for cell in row %}
+                <td>{{ cell }}</td>
+            {% endfor %}
+            <td>
+                <form action="/delete/{{ row[0] }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this row?');">
+                <button type="submit">Delete</button>
+                </form>
+            </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

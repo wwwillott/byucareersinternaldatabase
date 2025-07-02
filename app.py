@@ -56,5 +56,37 @@ def add_row():
     conn.close()
     return redirect('/editor')
 
+@app.route('/viewer')
+def viewer():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Get column names
+    cursor.execute("""
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_NAME = 'Employers'
+        ORDER BY ORDINAL_POSITION
+    """)
+    columns = [row[0] for row in cursor.fetchall()]
+
+    # Get all rows
+    cursor.execute("SELECT * FROM Employers")
+    rows = cursor.fetchall()
+
+    conn.close()
+    return render_template('viewer.html', columns=columns, rows=rows)
+
+@app.route('/delete/<int:EmployerID>', methods=['POST'])
+def delete_row(EmployerID):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM Employers WHERE EmployerID = %s", (EmployerID,))
+    conn.commit()
+    conn.close()
+
+    return redirect('/viewer')
+
 if __name__ == '__main__':
     app.run(debug=True)
