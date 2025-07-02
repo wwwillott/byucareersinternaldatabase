@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Editor View</title>
+</head>
+<body>
+  <h1>Editor View</h1>
+
+  <h2>Add a New Column</h2>
+  <form action="/add_column" method="post">
+    Column Name: <input type="text" name="column_name" required>
+    Column Type: <input type="text" name="column_type" placeholder="e.g. VARCHAR(100)" required>
+    <button type="submit">Add Column</button>
+  </form>
+
+  <h2>Add a New Row</h2>
+  <form action="/add_row" method="post">
+    {% for column in columns %}
+      {% if column != 'id' %}
+        {{ column }}: <input type="text" name="column_{{ column }}"><br>
+      {% endif %}
+    {% endfor %}
+    <button type="submit">Insert Row</button>
+  </form>
+
+  <hr>
+  <p><a href="/viewer">Go to Viewer View (coming soon)</a></p>
+</body>
+</html>
