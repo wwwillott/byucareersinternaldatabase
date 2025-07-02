@@ -1,17 +1,18 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Editor</title>
-</head>
-<body>
-  <h1>Add New Row</h1>
+{% extends "base.html" %}
 
-  <form action="/add_row" method="POST">
+{% block title %}Add Row - {{ table_name }}{% endblock %}
+
+{% block content %}
+  <h2>Add Row to {{ table_name }}</h2>
+
+  <form action="/add_row/{{ table_name }}" method="POST">
     {% for column in columns %}
-      <label for="{{ column }}">{{ column }}:</label>
-      <input type="text" name="column_{{ column }}" id="{{ column }}"><br>
+      <div class="mb-3">
+        <label for="column_{{ column }}" class="form-label">{{ column }}</label>
+        <input type="text" class="form-control" name="column_{{ column }}" id="column_{{ column }}">
+      </div>
     {% endfor %}
-    <button type="submit">Insert Row</button>
+    <button type="submit" class="btn btn-success">Submit</button>
   </form>
-</body>
-</html>
+{% endblock %}
+
