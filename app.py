@@ -1,7 +1,19 @@
 from flask import Flask, request, render_template, redirect
 import pymssql  # uses easier connection than pyodbc
+from datetime import datetime
 
 app = Flask(__name__)
+
+def get_season_background():
+    month = datetime.now().month
+    if month in [12, 1, 2]:
+        return 'winter.png'
+    elif month in [3, 4, 5]:
+        return 'spring.jpg'
+    elif month in [6, 7, 8]:
+        return 'summer.jpg'
+    else:
+        return 'fall.jpg'
 
 def get_connection():
     return pymssql.connect(
@@ -217,6 +229,10 @@ def final_delete(table_name):
     conn.close()
 
     return redirect(f'/view/{table_name}')
+
+@app.context_processor
+def inject_background_image():
+    return dict(background_image=get_season_background())
 
 if __name__ == '__main__':
     app.run(debug=True)
