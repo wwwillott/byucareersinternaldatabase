@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Advanced Editor - {{ table_name }}{% endblock %}
+
+{% block content %}
+<h2>Advanced Editor for {{ table_name }}</h2>
+<p class="text-muted">Use these tools with caution. Advanced operations can modify the database in bulk.</p>
+
+<div class="d-grid gap-3 mt-4">
+  <a href="{{ url_for('upload_csv', table_name=table_name) }}" class="btn btn-outline-danger btn-lg">
+    <i class="bi bi-upload"></i> Bulk Upload CSV
+  </a>
+  <a href="{{ url_for('editor', table_name=table_name) }}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Back to Editor
+  </a>
+</div>
+{% endblock %}

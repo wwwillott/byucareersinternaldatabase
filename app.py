@@ -1,6 +1,9 @@
-from flask import Flask, request, render_template, redirect
+from flask import Flask, request, render_template, redirect, flash, session
 import pymssql  # uses easier connection than pyodbc
 from datetime import datetime
+from werkzeug.utils import secure_filename
+import csv
+import io
 
 app = Flask(__name__)
 
@@ -125,6 +128,113 @@ def editor_wizard(table_name):
                            column_descriptions=column_descriptions,
                            dropdown_options=dropdown_options)
 
+@app.route('/advanced_editor/<table_name>')
+def advanced_editor(table_name):
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    if table_name not in allowed_tables:
+        return "Table not found", 404
+    return render_template('advanced_editor.html', table_name=table_name)
+
+@app.route('/upload_csv/<table_name>', methods=['GET', 'POST'])
+def upload_csv(table_name):
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    if table_name not in allowed_tables:
+        return "Table not found", 404
+
+    if request.method == 'POST':
+        file = request.files.get('csv_file')
+        if not file:
+            return "No file uploaded", 400
+
+        import csv
+        import io
+
+        # Get the actual columns from the database
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT COLUMN_NAME 
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_NAME = %s
+            ORDER BY ORDINAL_POSITION
+        """, (table_name,))
+        actual_columns = [row[0] for row in cursor.fetchall()]
+
+        decoded = file.read().decode('utf-8')
+        reader = csv.reader(io.StringIO(decoded))
+        headers = next(reader)
+
+        # Validate headers
+        for header in headers:
+            if header not in actual_columns:
+                return f"Invalid column name in CSV: {header}", 400
+
+        # Proceed with inserting
+        placeholders = ', '.join(['%s'] * len(headers))
+        columns = ', '.join(f"[{col}]" for col in headers)
+        insert_query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+
+        def clean_value(val):
+            if val is None:
+                return None
+            val = str(val).strip()
+            if val == '' or val.lower() == 'none':
+                return None
+            return val
+
+        for row in reader:
+            cleaned_row = [clean_value(val) for val in row]
+            cursor.execute(insert_query, tuple(cleaned_row))
+
+        conn.commit()
+        conn.close()
+        return redirect(f'/view/{table_name}')
+
+
+    return render_template('upload_csv.html', table_name=table_name)
+
+@app.route('/preview_csv/<table_name>', methods=['POST'])
+def preview_csv(table_name):
+    from flask import session, flash, url_for
+    import csv
+    import io
+    file = request.files.get('csv_file')
+    if not file or not file.filename.endswith('.csv'):
+        flash('Please upload a valid CSV file.', 'danger')
+        return redirect(url_for('editor_wizard', table_name=table_name))
+
+    contents = file.read().decode('utf-8')
+    reader = csv.reader(io.StringIO(contents))
+    rows = list(reader)
+    
+    if not rows:
+        flash('CSV file is empty.', 'danger')
+        return redirect(url_for('editor_wizard', table_name=table_name))
+
+    headers = rows[0]
+    data = rows[1:]
+
+    # Get table columns from DB
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_NAME = %s
+        ORDER BY ORDINAL_POSITION
+    """, (table_name,))
+    expected_columns = [row[0] for row in cursor.fetchall()]
+    conn.close()
+
+    # Validate headers match DB columns
+    if set(headers) - set(expected_columns):
+        flash("CSV contains unknown columns.", "danger")
+        return redirect(url_for('editor_wizard', table_name=table_name))
+
+    session['csv_headers'] = headers
+    session['csv_data'] = data
+
+    return render_template('csv_preview.html', table_name=table_name, headers=headers, rows=data)
 
 @app.route('/view/<table_name>', methods=['GET', 'POST'])
 def view_table(table_name):

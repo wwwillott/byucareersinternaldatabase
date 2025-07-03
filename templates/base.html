@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>{% block title %}BYU Careers DB{% endblock %}</title>
+  <title>{% block title %}BYU Careers Database{% endblock %}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
@@ -98,7 +98,8 @@
 
       const tooltip = document.getElementById('tipTooltip');
       const tipText = document.getElementById('tipText');
-
+      
+      // Randomly select an initial tip index
       let index = Math.floor(Math.random() * tips.length);
 
       function cycleTip() {
@@ -111,10 +112,12 @@
         }, 1000);
       }
 
+      // Initial tip display
       tipText.textContent = tips[index];
       tooltip.classList.add('fade-in');
       index = (index + 1) % tips.length;
 
+      // Cycle tips every 7 seconds
       setInterval(cycleTip, 7000);
     });
   </script>
