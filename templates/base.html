@@ -34,7 +34,7 @@
       padding: 12px 18px;
       border-radius: 8px;
       font-size: 0.95rem;
-      z-index: 5;
+      z-index: -1;
       max-width: 90%;
       text-align: center;
       opacity: 0;
@@ -122,7 +122,31 @@
     });
   </script>
 
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+      tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+        new bootstrap.Tooltip(tooltipTriggerEl, {
+          delay: { "show": 1000, "hide": 100 } // delay in milliseconds
+        })
+      })
+    });
+  </script>
+
   {% block scripts %}{% endblock %}
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="container mt-3">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
 
 </body>
 </html>

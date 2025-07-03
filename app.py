@@ -1,11 +1,12 @@
-from flask import Flask, request, render_template, redirect, flash, session
+from flask import Flask, request, render_template, redirect, flash, session, Response
 import pymssql  # uses easier connection than pyodbc
 from datetime import datetime
-from werkzeug.utils import secure_filename
 import csv
 import io
 
 app = Flask(__name__)
+
+app.secret_key = 'supersecretkey'  # Change this to a random secret key in production
 
 def get_season_background():
     month = datetime.now().month
@@ -135,86 +136,109 @@ def advanced_editor(table_name):
         return "Table not found", 404
     return render_template('advanced_editor.html', table_name=table_name)
 
+@app.route('/download_template/<table_name>')
+def download_template(table_name):
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    if table_name not in allowed_tables:
+        return "Table not found", 404
+
+    # Connect and get columns for this table
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_NAME = %s
+        ORDER BY ORDINAL_POSITION
+    """, (table_name,))
+    columns = [row[0] for row in cursor.fetchall()]
+    conn.close()
+
+    # Create CSV in memory with just headers (no rows)
+    def generate():
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(columns)
+        yield output.getvalue()
+
+    headers = {
+        "Content-Disposition": f"attachment; filename={table_name}_template.csv",
+        "Content-Type": "text/csv",
+    }
+    return Response(generate(), headers=headers)
+
 @app.route('/upload_csv/<table_name>', methods=['GET', 'POST'])
 def upload_csv(table_name):
     allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
-    if request.method == 'POST':
-        file = request.files.get('csv_file')
-        if not file:
-            return "No file uploaded", 400
+    if request.method == 'GET':
+        return render_template('upload_csv.html', table_name=table_name)
 
-        import csv
-        import io
+    # POST handler (final confirm insert)
+    headers = session.get('csv_headers')
+    data = session.get('csv_data')
 
-        # Get the actual columns from the database
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT COLUMN_NAME 
-            FROM INFORMATION_SCHEMA.COLUMNS 
-            WHERE TABLE_NAME = %s
-            ORDER BY ORDINAL_POSITION
-        """, (table_name,))
-        actual_columns = [row[0] for row in cursor.fetchall()]
+    if not headers or not data:
+        return "No CSV data found in session.", 400
+    
+    conn = get_connection()
+    cursor = conn.cursor()
 
-        decoded = file.read().decode('utf-8')
-        reader = csv.reader(io.StringIO(decoded))
-        headers = next(reader)
+    placeholders = ', '.join(['%s'] * len(headers))
+    columns = ', '.join(f"[{col}]" for col in headers)
+    insert_query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
 
-        # Validate headers
-        for header in headers:
-            if header not in actual_columns:
-                return f"Invalid column name in CSV: {header}", 400
+    def clean_value(val):
+        if val is None:
+            return None
+        val = str(val).strip()
+        if val == '' or val.lower() == 'none':
+            return None
+        return val
 
-        # Proceed with inserting
-        placeholders = ', '.join(['%s'] * len(headers))
-        columns = ', '.join(f"[{col}]" for col in headers)
-        insert_query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+    for row in data:
+        cleaned_row = [clean_value(val) for val in row]
+        cursor.execute(insert_query, tuple(cleaned_row))
 
-        def clean_value(val):
-            if val is None:
-                return None
-            val = str(val).strip()
-            if val == '' or val.lower() == 'none':
-                return None
-            return val
+    conn.commit()
+    conn.close()
 
-        for row in reader:
-            cleaned_row = [clean_value(val) for val in row]
-            cursor.execute(insert_query, tuple(cleaned_row))
+    # Clear session
+    session.pop('csv_headers', None)
+    session.pop('csv_data', None)
 
-        conn.commit()
-        conn.close()
-        return redirect(f'/view/{table_name}')
+    return redirect(f'/view/{table_name}')
 
-
-    return render_template('upload_csv.html', table_name=table_name)
 
 @app.route('/preview_csv/<table_name>', methods=['POST'])
 def preview_csv(table_name):
-    from flask import session, flash, url_for
+    from flask import session, flash, redirect, url_for
     import csv
     import io
+
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    if table_name not in allowed_tables:
+        return "Table not found", 404
+
     file = request.files.get('csv_file')
     if not file or not file.filename.endswith('.csv'):
         flash('Please upload a valid CSV file.', 'danger')
-        return redirect(url_for('editor_wizard', table_name=table_name))
+        return redirect(url_for('upload_csv', table_name=table_name))
 
     contents = file.read().decode('utf-8')
     reader = csv.reader(io.StringIO(contents))
     rows = list(reader)
-    
+
     if not rows:
         flash('CSV file is empty.', 'danger')
-        return redirect(url_for('editor_wizard', table_name=table_name))
+        return redirect(url_for('upload_csv', table_name=table_name))
 
     headers = rows[0]
     data = rows[1:]
 
-    # Get table columns from DB
+    # Get DB columns for validation
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -226,11 +250,12 @@ def preview_csv(table_name):
     expected_columns = [row[0] for row in cursor.fetchall()]
     conn.close()
 
-    # Validate headers match DB columns
+    # Validate headers
     if set(headers) - set(expected_columns):
         flash("CSV contains unknown columns.", "danger")
-        return redirect(url_for('editor_wizard', table_name=table_name))
+        return redirect(url_for('upload_csv', table_name=table_name))
 
+    # Save to session for confirmation step
     session['csv_headers'] = headers
     session['csv_data'] = data
 
@@ -283,7 +308,7 @@ def delete_row(EmployerID):
     conn.commit()
     conn.close()
 
-    return redirect('/viewer')
+    return redirect('/view/Employers')
 
 @app.route('/delete_mode/<table_name>')
 def delete_mode(table_name):

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}CSV Preview - {{ table_name }}{% endblock %}
+
+{% block content %}
+<h2>Preview CSV for {{ table_name }}</h2>
+
+<div class="table-responsive">
+  <table class="table table-striped table-bordered">
+    <thead class="table-dark">
+      <tr>
+        {% for header in headers %}
+          <th>{{ header }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+        <tr>
+          {% for cell in row %}
+            <td>{{ cell }}</td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<form method="POST" action="{{ url_for('upload_csv', table_name=table_name) }}">
+  <button type="submit" class="btn btn-success">Confirm Upload</button>
+  <a href="{{ url_for('advanced_editor', table_name=table_name) }}" class="btn btn-secondary ms-2">Cancel</a>
+</form>
+{% endblock %}

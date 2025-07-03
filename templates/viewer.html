@@ -6,13 +6,13 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>{{ table_name }} Table Viewer</h2>
     <div>
-      <a href="/editor_wizard/{{ table_name }}" class="btn btn-primary me-2">Add Row (Step-by-Step, Beginner-Friendly)</a>
-      <a href="/editor/{{ table_name }}" class="btn btn-secondary">Add Row (Basic Form, No Explanations)</a>
-      <button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#columnDrawer" aria-expanded="false" aria-controls="columnDrawer">
+      <a href="/editor_wizard/{{ table_name }}" class="btn btn-primary me-1">Add Row (Step-by-Step, Beginner-Friendly)</a>
+      <a href="/editor/{{ table_name }}" class="btn btn-secondary me-1">Add Row (Basic Form, No Explanations)</a>
+      <button class="btn btn-outline-secondary me-1" type="button" data-bs-toggle="collapse" data-bs-target="#columnDrawer" aria-expanded="false" aria-controls="columnDrawer">
         Filter Columns
       </button>
-      <a href="{{ url_for('advanced_editor', table_name=table_name) }}" class="btn btn-outline-primary float-end">Advanced Editor</a>
-      <a href="/delete_mode/{{ table_name }}" class="btn btn-danger ms-2">Delete Mode</a>
+      <a href="{{ url_for('advanced_editor', table_name=table_name) }}" class="btn btn-outline-primary me-1">Advanced Editor</a>
+      <a href="/delete_mode/{{ table_name }}" class="btn btn-danger me-1">Delete Mode</a>
     </div>
   </div>
 

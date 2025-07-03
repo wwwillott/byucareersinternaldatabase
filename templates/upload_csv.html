@@ -3,13 +3,14 @@
 
 {% block content %}
 <h2>Upload CSV to {{ table_name }}</h2>
-<form method="POST" enctype="multipart/form-data" class="mt-4">
+<form method="POST" enctype="multipart/form-data" action="{{ url_for('preview_csv', table_name=table_name) }}">
   <div class="mb-3">
-    <label for="csv_file" class="form-label">Choose CSV File</label>
-    <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
-    <div class="form-text">Make sure your headers match the column names exactly.</div>
+    <label for="csvFile" class="form-label">Select CSV file</label>
+    <input class="form-control" type="file" id="csvFile" name="csv_file" accept=".csv" required>
   </div>
-  <button type="submit" class="btn btn-success"><i class="bi bi-upload"></i> Upload</button>
-  <a href="{{ url_for('advanced_editor', table_name=table_name) }}" class="btn btn-secondary">Cancel</a>
+  <div class="d-flex align-items-center gap-2">
+    <button type="submit" class="btn btn-primary">Upload CSV</button>
+    <a href="{{ url_for('download_template', table_name=table_name) }}" class="btn btn-outline-secondary" data-bs-toggle="tooltip" title="Need help? Download a template and copy/paste the fields as needed.">Download CSV Template</a>
+  </div>
 </form>
 {% endblock %}
