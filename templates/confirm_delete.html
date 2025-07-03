@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Confirm Delete - {{ table_name }}{% endblock %}
+
+{% block content %}
+<h2>Confirm Deletion</h2>
+<p>Are you sure you want to delete the following rows from <strong>{{ table_name }}</strong>? This cannot be undone.</p>
+
+<form method="POST" action="/final_delete/{{ table_name }}">
+  <input type="hidden" name="pk_column" value="{{ pk_column }}">
+  {% for row_id in row_ids %}
+    <input type="hidden" name="row_ids" value="{{ row_id }}">
+  {% endfor %}
+  <ul>
+    {% for row_id in row_ids %}
+      <li>ID: {{ row_id }}</li>
+    {% endfor %}
+  </ul>
+  <div class="d-flex justify-content-between mt-4">
+    <a href="/view/{{ table_name }}" class="btn btn-secondary">Cancel</a>
+    <button type="submit" class="btn btn-danger">Yes, Delete</button>
+  </div>
+</form>
+{% endblock %}

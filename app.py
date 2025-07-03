@@ -11,6 +11,22 @@ def get_connection():
         database='Career_Services_Database'
     )
 
+def get_primary_key_column(table_name):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(f"""
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+        WHERE OBJECTPROPERTY(
+          OBJECT_ID(CONSTRAINT_SCHEMA + '.' + CONSTRAINT_NAME),
+          'IsPrimaryKey'
+        ) = 1
+        AND TABLE_NAME = '{table_name}'
+    """)
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else None
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -146,6 +162,61 @@ def delete_row(EmployerID):
     conn.close()
 
     return redirect('/viewer')
+
+@app.route('/delete_mode/<table_name>')
+def delete_mode(table_name):
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    if table_name not in allowed_tables:
+        return "Table not found", 404
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(f"""
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_NAME = '{table_name}' 
+        ORDER BY ORDINAL_POSITION
+    """)
+    columns = [row[0] for row in cursor.fetchall()]
+    pk_column = get_primary_key_column(table_name) or columns[0]  # Fallback to first column if no PK found
+
+    cursor.execute(f"SELECT * FROM {table_name}")
+    rows = cursor.fetchall()
+
+    conn.close()
+    return render_template('delete_mode.html', table_name=table_name, columns=columns, rows=rows, pk_column=pk_column)
+
+
+@app.route('/confirm_delete/<table_name>', methods=['POST'])
+def confirm_delete(table_name):
+    row_ids = request.form.getlist('row_ids')
+    pk_column = request.form.get('pk_column')
+    return render_template('confirm_delete.html', table_name=table_name, row_ids=row_ids, pk_column=pk_column)
+
+
+@app.route('/final_delete/<table_name>', methods=['POST'])
+def final_delete(table_name):
+    row_ids = request.form.getlist('row_ids')
+    pk_column = request.form.get('pk_column')
+    if not row_ids or not pk_column:
+        return redirect(f'/view/{table_name}')
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    print("Deleting from:", table_name)
+    print("PK column:", pk_column)
+    print("Row IDs:", row_ids)
+
+    # Assumes first column is primary key
+    placeholders = ','.join(['%s'] * len(row_ids))
+    query = f"DELETE FROM {table_name} WHERE {pk_column} IN ({placeholders})"
+    cursor.execute(query, tuple(row_ids))
+    conn.commit()
+    conn.close()
+
+    return redirect(f'/view/{table_name}')
 
 if __name__ == '__main__':
     app.run(debug=True)
