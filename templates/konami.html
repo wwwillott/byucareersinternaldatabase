@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Secret Adventure</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden; background: black;
+    user-select: none;
+  }
+  canvas {
+    display: block;
+    background: rgb(82, 73, 73);
+    image-rendering: pixelated;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+
+  // Resize canvas to fill entire window
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // Tile size
+  const tileSize = 50;
+
+  // Calculate grid dimensions dynamically based on canvas size
+  let cols = Math.floor(canvas.width / tileSize);
+  let rows = Math.floor(canvas.height / tileSize);
+
+  // Door position - somewhere along the top row, let's say near center
+  let door = { x: Math.floor(cols / 2), y: 0 };
+
+  // Player starts just above bottom wall, centered horizontally
+  let player = { x: door.x, y: rows - 2 };
+
+  // Key states for movement
+  const keys = {};
+
+  // Pixel font for letters (5x7) - only letters in "Created by wwwillott"
+  // Each letter is 5 cols wide x 7 rows high, '1' means orange block, '0' empty
+  const pixelFont = {
+    'a': [
+      "00000",
+      "00000",
+      "11111",
+      "00001",
+      "11111",
+      "10001",
+      "11111"
+    ],
+    'C': [
+      "01111",
+      "10000",
+      "10000",
+      "10000",
+      "10000",
+      "10000",
+      "01111"
+    ],
+    'e': [
+      "00000",
+      "00000",
+      "11111",
+      "10001",
+      "11111",
+      "10000",
+      "11111"
+    ],
+    'r': [
+      "00000",
+      "00000",
+      "10000",
+      "11110",
+      "10000",
+      "10000",
+      "10000"
+    ],
+    'w': [
+      "00000",
+      "00000",
+      "10001",
+      "10001",
+      "10101",
+      "10101",
+      "11111"
+    ],
+    ' ': [
+      "00000",
+      "00000",
+      "00000",
+      "00000",
+      "00000",
+      "00000",
+      "00000"
+    ],
+    'b': [
+      "10000",
+      "10000",
+      "10110",
+      "11001",
+      "10001",
+      "11001",
+      "10110"
+    ],
+    'y': [
+      "10001",
+      "10001",
+      "10001",
+      "01110",
+      "00100",
+      "01000",
+      "10000"
+    ],
+    'i': [
+      "00100",
+      "00000",
+      "01100",
+      "00100",
+      "00100",
+      "00100",
+      "01110"
+    ],
+    'l': [
+      "01000",
+      "01000",
+      "01000",
+      "01000",
+      "01000",
+      "01000",
+      "00110"
+    ],
+    'o': [
+      "00000",
+      "00000",
+      "01110",
+      "10001",
+      "10001",
+      "10001",
+      "01110"
+    ],
+    'd': [
+      "00000",
+      "00001",
+      "00001",
+      "11111",
+      "10001",
+      "10001",
+      "11111"
+    ],
+    '.': [
+      "00000",
+      "00000",
+      "00000",
+      "00100",
+      "00000",
+      "00000",
+      "00000"
+    ],
+    '-': [
+      "00000",
+      "00000",
+      "00000",
+      "00000",
+      "00010",
+      "00010",
+      "00000"
+    ],
+    't': [
+      "00100",
+      "00100",
+      "11110",
+      "00100",
+      "00100",
+      "00101",
+      "00010"
+    ]
+  };
+
+  // Message to render vertically (each letter stacked top->bottom)
+  const message = "Created wwwi....";
+
+  // Block size for each pixel in the letter
+  const blockSize = 6; // px
+  const letterWidth = 5 * blockSize;
+  const letterHeight = 7 * blockSize;
+  const letterSpacing = 6; // space between letters vertically
+
+  // Draw the pixel-block text vertically centered and horizontally centered
+  function drawPixelTextVertical() {
+    // Calculate total height for the whole vertical message:
+    const totalHeight = message.length * (letterHeight + letterSpacing) - letterSpacing;
+
+    // Center horizontally
+    const startX = (canvas.width - letterWidth) / 2;
+    // Start vertically so whole text is centered vertically
+    const startY = (canvas.height - totalHeight) / 2;
+
+    ctx.fillStyle = 'orange';
+
+    for (let i = 0; i < message.length; i++) {
+      const char = message[i];
+      const pattern = pixelFont[char] || pixelFont[' '];
+
+      // x and y offset for this letter
+      const xOffset = startX;
+      const yOffset = startY + i * (letterHeight + letterSpacing);
+
+      // draw the letter pixel blocks
+      for (let row = 0; row < pattern.length; row++) {
+        for (let col = 0; col < pattern[row].length; col++) {
+          if (pattern[row][col] === '1') {
+            ctx.fillRect(
+              xOffset + col * blockSize,
+              yOffset + row * blockSize,
+              blockSize,
+              blockSize
+            );
+          }
+        }
+      }
+    }
+  }
+
+  message2 = "    by.......-llott";
+  // Draw the pixel-block text vertically centered and horizontally centered
+  function drawPixelTextVertical2() {
+    // Calculate total height for the whole vertical message:
+    const totalHeight = message2.length * (letterHeight + letterSpacing) - letterSpacing;
+
+    // Center horizontally
+    const startX = ((canvas.width - letterWidth) / 2) + 40;
+    // Start vertically so whole text is centered vertically
+    const startY = (canvas.height - totalHeight) / 2;
+
+    ctx.fillStyle = 'orange';
+
+    for (let i = 0; i < message2.length; i++) {
+      const char = message2[i];
+      const pattern = pixelFont[char] || pixelFont[' '];
+
+      // x and y offset for this letter
+      const xOffset = startX;
+      const yOffset = startY + i * (letterHeight + letterSpacing);
+
+      // draw the letter pixel blocks
+      for (let row = 0; row < pattern.length; row++) {
+        for (let col = 0; col < pattern[row].length; col++) {
+          if (pattern[row][col] === '1') {
+            ctx.fillRect(
+              xOffset + col * blockSize,
+              yOffset + row * blockSize,
+              blockSize,
+              blockSize
+            );
+          }
+        }
+      }
+    }
+  }
+
+
+  // Draw function
+  function draw() {
+    // Clear screen
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Recalculate cols and rows on resize
+    cols = Math.floor(canvas.width / tileSize);
+    rows = Math.floor(canvas.height / tileSize);
+
+    // Draw top and bottom walls
+    ctx.fillStyle = 'magenta';
+    for (let x = 0; x < cols; x++) {
+      // Top wall
+      if (x === door.x) {
+        // Door in yellow
+        ctx.fillStyle = 'yellow';
+        ctx.fillRect(2*x * tileSize, 0, tileSize, tileSize);
+        ctx.fillStyle = 'magenta';
+      } else {
+        ctx.fillRect(x * tileSize, 0, tileSize, tileSize);
+      }
+
+      // Bottom wall
+      ctx.fillRect(x * tileSize, (rows - 1) * tileSize, tileSize, tileSize);
+    }
+
+    // Draw player (white square with black border)
+    ctx.fillStyle = 'white';
+    ctx.fillRect(player.x * tileSize + 10, player.y * tileSize + 10, tileSize - 20, tileSize - 20);
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(player.x * tileSize + 10, player.y * tileSize + 10, tileSize - 20, tileSize - 20);
+
+    // Draw the vertical orange pixel text
+    drawPixelTextVertical();
+    drawPixelTextVertical2();
+  }
+
+  // Check if position is inside bounds and not inside walls
+  function canMoveTo(x, y) {
+    // Stay inside grid bounds
+    if (x < 0 || x >= cols || y < 0 || y >= rows) return false;
+
+    // Walls on top and bottom rows except door at top
+    if (y === 0 && x !== door.x) return false;
+    if (y === rows - 1) return false;
+
+    return true;
+  }
+
+  // Move player if possible
+  function movePlayer(dx, dy) {
+    const newX = player.x + dx;
+    const newY = player.y + dy;
+
+    if (canMoveTo(newX, newY)) {
+      player.x = newX;
+      player.y = newY;
+
+      // If player reached the door, go back to homepage
+      if (player.x === door.x && player.y === 0) {
+        window.location.href = '/';
+      }
+    }
+  }
+
+  // Listen for keys (WASD or arrows)
+  window.addEventListener('keydown', (e) => {
+    if (keys[e.code]) return; // prevent holding key repeat
+    keys[e.code] = true;
+
+    switch(e.code) {
+      case 'KeyW':
+      case 'ArrowUp':
+        movePlayer(0, -1);
+        break;
+      case 'KeyA':
+      case 'ArrowLeft':
+        movePlayer(-1, 0);
+        break;
+      case 'KeyS':
+      case 'ArrowDown':
+        movePlayer(0, 1);
+        break;
+      case 'KeyD':
+      case 'ArrowRight':
+        movePlayer(1, 0);
+        break;
+    }
+
+    draw();
+  });
+
+  window.addEventListener('keyup', (e) => {
+    keys[e.code] = false;
+  });
+
+  draw();
+</script>
+
+</body>
+</html>

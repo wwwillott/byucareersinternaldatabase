@@ -365,6 +365,10 @@ def final_delete(table_name):
 
     return redirect(f'/view/{table_name}')
 
+@app.route('/konami')
+def konami():
+    return render_template('konami.html')
+
 @app.context_processor
 def inject_background_image():
     return dict(background_image=get_season_background())

@@ -8,3 +8,24 @@
   <p>Use the sidebar to explore the data tables.</p>
   <p>If you see an error with a bunch of blue text, try reloading the page. Sometimes the database connection is slow.</p>
 {% endblock %}
+
+{% block scripts %}
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const konamiCode = [38,38,40,40,37,39,37,39,66,65]; // up up down down left right left right B A
+      let konamiPosition = 0;
+
+      window.addEventListener('keydown', (e) => {
+        if (e.keyCode === konamiCode[konamiPosition]) {
+          konamiPosition++;
+          if (konamiPosition === konamiCode.length) {
+            // Full code entered, redirect to secret page
+            window.location.href = '/konami'; // Change this to your secret URL
+          }
+        } else {
+          konamiPosition = 0; // reset if wrong key
+        }
+      });
+    });
+  </script>
+{% endblock %}
