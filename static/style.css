@@ -21,11 +21,60 @@
   width: 100%;
   visibility: hidden;
   opacity: 0;
-  transition: opacity 0.6s ease;
+  transition: opacity 0.6s ease, transform 0.6s ease;
+  transform: translateY(20px);
 }
 
 .carousel-item.active {
   position: relative;
   visibility: visible;
   opacity: 1;
+  transform: translateY(0);
+}
+.content-card {
+  background-color: #ffffff;
+  border-radius: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+.btn {
+  transition: all 0.2s ease-in-out;
+}
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+body {
+  background-color: #f8f9fa;
+}
+
+html, body {
+  height: 100%;
+}
+.table {
+  border-collapse: separate;
+  border-spacing: 0 0.5rem;
+}
+
+.table th,
+.table td {
+  vertical-align: middle;
+}
+
+.table thead th {
+  background-color: #343a40;
+  color: white;
+  border: none;
+}
+
+.table-hover tbody tr:hover {
+  background-color: #f1f3f5;
+}
+.form-label {
+  font-weight: 600;
+  color: #343a40;
+}
+
+.form-text {
+  font-size: 0.9rem;
+  color: #6c757d;
 }

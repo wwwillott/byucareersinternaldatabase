@@ -3,16 +3,29 @@
 {% block title %}Add Row - {{ table_name }}{% endblock %}
 
 {% block content %}
-  <h2>Add Row to {{ table_name }}</h2>
 
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Add Row to {{ table_name }}</h2>
+    <a href="/view/{{ table_name }}" class="btn btn-secondary">Return to Viewer</a>
+  </div>
+
+{% if columns %}
+  <p class="text-muted">You can add a new row by filling out the form below. Each field corresponds to a column in the <strong>{{ table_name }}</strong> table.</p>
+{% else %}
+  <p class="text-danger">No columns found for this table. Please check your database schema.</p>
+{% endif %}
+
+<div class="card shadow-sm rounded-4 p-4 bg-white">
   <form action="/add_row/{{ table_name }}" method="POST">
     {% for column in columns %}
-      <div class="mb-3">
-        <label for="column_{{ column }}" class="form-label">{{ column }}</label>
-        <input type="text" class="form-control" name="column_{{ column }}" id="column_{{ column }}">
+      <div class="mb-4">
+        <label for="column_{{ column }}" class="form-label fw-semibold text-dark">{{ column }}</label>
+        <input type="text" class="form-control" name="column_{{ column }}" id="column_{{ column }}" placeholder="Enter {{ column }}">
       </div>
     {% endfor %}
-    <button type="submit" class="btn btn-success">Submit</button>
+    <div class="d-flex justify-content-end mt-4">
+      <button type="submit" class="btn btn-success px-4">Submit</button>
+    </div>
   </form>
 {% endblock %}
 
