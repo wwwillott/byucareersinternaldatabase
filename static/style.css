@@ -78,3 +78,14 @@ html, body {
   font-size: 0.9rem;
   color: #6c757d;
 }
+
+.dropdown-item {
+  background-color: #444;
+  color: white;
+  transition: background-color 0.3s ease;
+}
+
+.dropdown-item:hover {
+  background-color: #555;
+  cursor: pointer;
+}
