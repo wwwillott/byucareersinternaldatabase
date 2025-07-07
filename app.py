@@ -113,9 +113,16 @@ def editor_wizard(table_name):
     conn.close()
 
     column_descriptions = {
-        'EventID': 'To get the ID, go to the Info Session on Handshake and copy the number from the URL.',
-        'EmployerID': 'To get the ID, go to the Employer on Handshake and copy the number from the URL.',
-        'InterviewID': 'To get the ID, go to the Interview on Handshake and copy the number from the URL.'
+        # 'InfoSessions' table
+        'EventID': 'To get the ID, go to the Info Session event on Handshake and copy the number at the end of the URL.',
+        'EmployerName': 'The name of the employer as it appears on Handshake.',
+        'Weekday': 'The day of the week for the event.',
+        'EventDate': 'The date of the event in YYYY-MM-DD format. Please type it exactly as shown or the system will not recognize it. Ex. 2027-07-17',
+        'EventTime': 'The time of the event in HH:MM 24h format. Please type it exactly as shown or the system will not recognize it. Ex. 14:00',
+        # 'Employers' table
+        'EmployerID': "To get the ID, go to the Employer's profile on Handshake and copy the number at end of the URL.",
+        # 'Interviews' table
+        'InterviewID': 'To get the ID, go to the Interview event on Handshake and copy the number at the end of the URL.'
     }
 
     dropdown_options = {
@@ -365,6 +372,103 @@ def final_delete(table_name):
 
     return redirect(f'/view/{table_name}')
 
+@app.route('/edit_mode/<table_name>', methods=['GET', 'POST'])
+def edit_mode(table_name):
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    if table_name not in allowed_tables:
+        return "Table not found", 404
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(f"""
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_NAME = '{table_name}' 
+        ORDER BY ORDINAL_POSITION
+    """)
+    columns = [row[0] for row in cursor.fetchall()]
+    pk_column = get_primary_key_column(table_name) or columns[0]
+
+    cursor.execute(f"SELECT * FROM {table_name}")
+    rows = cursor.fetchall()
+    conn.close()
+
+    return render_template('edit_mode.html', table_name=table_name, columns=columns, rows=rows, pk_column=pk_column)
+
+@app.route('/edit_row_form/<table_name>', methods=['POST'])
+def edit_row_form(table_name):
+    row_id = request.form.get('row_id')
+    pk_column = request.form.get('pk_column')
+
+    if not row_id or not pk_column:
+        return redirect(f'/edit_mode/{table_name}')
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(f"""
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_NAME = '{table_name}' 
+        ORDER BY ORDINAL_POSITION
+    """)
+    columns = [row[0] for row in cursor.fetchall()]
+
+    cursor.execute(f"SELECT * FROM {table_name} WHERE [{pk_column}] = %s", (row_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return "Row not found", 404
+
+    return render_template("edit_row_form.html", table_name=table_name, columns=columns, row=row, pk_column=pk_column)
+
+@app.route('/submit_edit/<table_name>', methods=['POST'])
+def submit_edit(table_name):
+    pk_column = request.form.get('pk_column')
+    row_id = request.form.get('row_id')
+
+    if not pk_column or not row_id:
+        return redirect(f'/view/{table_name}')
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(f"""
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_NAME = '{table_name}' 
+        ORDER BY ORDINAL_POSITION
+    """)
+    columns = [row[0] for row in cursor.fetchall()]
+
+    # Build update query
+    update_clauses = []
+    values = []
+
+    def clean(val):
+        val = val.strip()
+        if val.lower() == 'none' or val == '':
+            return None
+        return val
+
+    for col in columns:
+        if col == pk_column:
+            continue
+        update_clauses.append(f"[{col}] = %s")
+        raw_value = request.form.get(col, '')
+        values.append(clean(raw_value))
+
+    values.append(row_id)
+
+    query = f"UPDATE {table_name} SET {', '.join(update_clauses)} WHERE [{pk_column}] = %s"
+    cursor.execute(query, values)
+    conn.commit()
+    conn.close()
+
+    return redirect(f'/view/{table_name}')
+
 @app.route('/konami')
 def konami():
     return render_template('konami.html')
@@ -372,6 +476,18 @@ def konami():
 @app.context_processor
 def inject_background_image():
     return dict(background_image=get_season_background())
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    return render_template('500.html'), 500
+
+@app.errorhandler(404)
+def internal_server_error(e):
+    return render_template('404.html'), 404
+
+@app.errorhandler(403)
+def internal_server_error(e):
+    return render_template('403.html'), 403
 
 if __name__ == '__main__':
     import os

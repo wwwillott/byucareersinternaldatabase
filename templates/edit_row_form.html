@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Edit Row - {{ table_name }}{% endblock %}
+
+{% block content %}
+<h2>Editing Row in {{ table_name }}</h2>
+<form method="POST" action="/submit_edit/{{ table_name }}">
+  <input type="hidden" name="pk_column" value="{{ pk_column }}">
+  <input type="hidden" name="row_id" value="{{ row[columns.index(pk_column)] }}">
+
+  {% for i in range(columns|length) %}
+    <div class="mb-3">
+      <label class="form-label">{{ columns[i] }}</label>
+      {% if columns[i] == pk_column %}
+        <input class="form-control" type="text" name="{{ columns[i] }}" value="{{ row[i] }}" readonly>
+      {% else %}
+        <input class="form-control" type="text" name="{{ columns[i] }}" value="{{ row[i] }}">
+      {% endif %}
+    </div>
+  {% endfor %}
+  <button type="submit" class="btn btn-success">Submit Edits</button>
+  <a href="/edit_mode/{{ table_name }}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

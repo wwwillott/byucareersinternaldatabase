@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Edit Rows - {{ table_name }}{% endblock %}
+
+{% block content %}
+<h2>Select a Row to Edit from {{ table_name }}</h2>
+<form method="POST" action="/edit_row_form/{{ table_name }}">
+  <input type="hidden" name="pk_column" value="{{ pk_column }}">
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th>Select</th>
+          {% for column in columns %}
+            <th>{{ column }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td><input type="radio" name="row_id" value="{{ row[columns.index(pk_column)] }}" required></td>
+          {% for cell in row %}
+            <td>{{ cell }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <button type="submit" class="btn btn-primary">Edit Selected Row</button>
+</form>
+{% endblock %}
