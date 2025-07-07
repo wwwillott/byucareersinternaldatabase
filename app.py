@@ -43,6 +43,35 @@ def get_primary_key_column(table_name):
     conn.close()
     return result[0] if result else None
 
+def normalize_time(value):
+    """Convert HH:MM or HH:MM:SS to HH:MM:SS; returns None if invalid or empty"""
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        # Try HH:MM format
+        return datetime.strptime(value, "%H:%M").time().strftime("%H:%M:%S")
+    except ValueError:
+        try:
+            # Try HH:MM:SS format
+            return datetime.strptime(value, "%H:%M:%S").time().strftime("%H:%M:%S")
+        except ValueError:
+            return None  # Or raise an error/flash message
+        
+def clean_value(val, col=None):
+    if val is None:
+        return None
+    val = str(val).strip()
+    if val == '' or val.lower() == 'none':
+        return None
+    if col in ['StartTime', 'EndTime']:
+        normalized = normalize_time(val)
+        if normalized is None:
+            # You could also flash here or raise error if you want strict validation
+            return None
+        return normalized
+    return val
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -80,10 +109,14 @@ def add_row(table_name):
     values = []
 
     for key, value in request.form.items():
-        if key.startswith("column_") and value.strip() != '':
+        if key.startswith("column_"):
             column_name = key.replace("column_", "")
+            cleaned_val = clean_value(value, column_name)
+            if cleaned_val is None and value.strip() != '':
+                flash(f"Invalid value for {column_name}.", 'danger')
+                return redirect(request.referrer)
             columns.append(column_name)
-            values.append(value.strip())
+            values.append(cleaned_val)
 
     if columns:
         placeholders = ', '.join(['%s'] * len(values))
@@ -197,16 +230,8 @@ def upload_csv(table_name):
     columns = ', '.join(f"[{col}]" for col in headers)
     insert_query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
 
-    def clean_value(val):
-        if val is None:
-            return None
-        val = str(val).strip()
-        if val == '' or val.lower() == 'none':
-            return None
-        return val
-
     for row in data:
-        cleaned_row = [clean_value(val) for val in row]
+        cleaned_row = [clean_value(val, col) for val, col in zip(row, headers)]
         cursor.execute(insert_query, tuple(cleaned_row))
 
     conn.commit()
@@ -447,18 +472,16 @@ def submit_edit(table_name):
     update_clauses = []
     values = []
 
-    def clean(val):
-        val = val.strip()
-        if val.lower() == 'none' or val == '':
-            return None
-        return val
-
     for col in columns:
         if col == pk_column:
             continue
         update_clauses.append(f"[{col}] = %s")
         raw_value = request.form.get(col, '')
-        values.append(clean(raw_value))
+        cleaned_val = clean_value(raw_value, col)
+        if cleaned_val is None and raw_value.strip() != '':
+            flash(f"Invalid value for {col}.", 'danger')
+            return redirect(request.referrer)
+        values.append(cleaned_val)
 
     values.append(row_id)
 
