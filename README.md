@@ -12,10 +12,10 @@ needed, someone will probably have to contact me at williamvott@gmail.com for in
 I can set up additional querying privileges on the database, so if you would like to populate your Excel sheets from the table, let me know.
 
 I am working on several parts of this project:
-  1. Filling the database with company data
+  1. Filling the database with company data, info sessions, and interviews
   2. Making the front-end website look nice
   3. Optimizing the user-experience to be simple and intuitive
   4. Ensuring access to all users and prioritizing availability
   5. Seamlessly connecting the database to front-end
 
-This project likely will be completed by late August 2025, but it may be put on hold until August 2026 depending on what happens.
+This project likely will be completed by late August 2025, but it may be put on hold until August 2026 depending on circumstances.
