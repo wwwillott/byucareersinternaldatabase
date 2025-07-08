@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Two Week Preview{% endblock %}
+{% block content %}
+
+<h2 class="text-center mb-4">Two Week Preview</h2>
+
+<div class="text-center mb-3">
+  <label for="majorGroupFilter">Filter by Major Group:</label>
+  <select id="majorGroupFilter" class="form-select d-inline-block w-auto">
+    <option value="">All</option>
+    <option value="Engineering">Civil and Construction</option>
+    <!-- Add more options as needed -->
+  </select>
+</div>
+
+<div id="calendar"></div>
+
+<style>
+  #calendar {
+    max-width: 1100px;
+    margin: 2rem auto;
+    background-color: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const calendarEl = document.getElementById('calendar');
+    const groupFilter = document.getElementById('majorGroupFilter');
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'timeGridWeek',
+      weekends: false,
+      slotMinTime: "06:00:00",
+      slotMaxTime: "22:00:00",
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: ''
+      },
+      visibleRange: function(currentDate) {
+        let today = new Date(currentDate);
+        let day = today.getDay();
+
+        let diffToMonday = (day === 0 ? -6 : 1) - day;
+
+        let monday = new Date(today);
+        monday.setDate(today.getDate() + diffToMonday);
+
+        // Next Friday is 9 days after Monday
+        let friday = new Date(monday);
+        friday.setDate(monday.getDate() + 9);
+
+        let dayAfterFriday = new Date(friday);
+        dayAfterFriday.setDate(friday.getDate() + 1);
+
+        return { start: monday.toISOString().split('T')[0], end: dayAfterFriday.toISOString().split('T')[0] };
+      },
+      events: function(fetchInfo, successCallback, failureCallback) {
+        const group = groupFilter.value;
+        let url = '/two_week_preview_events';
+        if (group) url += `?major_group=${encodeURIComponent(group)}`;
+
+        fetch(url)
+          .then(response => response.json())
+          .then(data => successCallback(data))
+          .catch(error => failureCallback(error));
+      },
+      eventClick: function(info) {
+        alert('Event: ' + info.event.title);
+      }
+    });
+
+    calendar.render();
+
+    groupFilter.addEventListener('change', () => {
+      calendar.refetchEvents();
+    });
+  });
+</script>
+
+{% endblock %}

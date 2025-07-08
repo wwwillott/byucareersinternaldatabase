@@ -548,6 +548,61 @@ def calendar_events():
 def calendar_view():
     return render_template('calendar.html')
 
+@app.route('/two_week_preview_events')
+def two_week_preview_events():
+    from datetime import datetime, timedelta
+    major_group = request.args.get('major_group')
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    today = datetime.today().date()
+    end_date = today + timedelta(days=14)
+
+    query = """
+        SELECT EventID, EmployerName, EventDate, StartTime, EndTime, Building, Room, MajorGroup
+        FROM InfoSessions
+        WHERE EventDate BETWEEN %s AND %s
+    """
+    params = [today, end_date]
+
+    if major_group:
+        query += " AND MajorGroup = %s"
+        params.append(major_group)
+
+    cursor.execute(query, tuple(params))
+
+    events = []
+    for event_id, name, date, start, end, building, room, group in cursor.fetchall():
+        start_time_str = safe_parse_time(start) if start else "00:00:00"
+        end_time_str = safe_parse_time(end) if end else None
+
+        start_str = f"{date}T{start_time_str}"
+        end_str = f"{date}T{end_time_str}" if end_time_str else None
+
+        location = f"{building or ''} {room or ''}".strip()
+
+        event = {
+            'title': f"{name} ({group})",  # Include major group visibly
+            'start': start_str,
+            'extendedProps': {
+                'location': location,
+                'link': f"https://byu.joinhandshake.com/stu/events/{event_id}",
+                'major_group': group
+            }
+        }
+        if end_str:
+            event['end'] = end_str
+
+        events.append(event)
+
+    conn.close()
+    return jsonify(events)
+
+@app.route('/two_week_preview')
+def two_week_preview():
+    return render_template('two_week_preview.html')
+
 @app.route('/konami')
 def konami():
     return render_template('konami.html')
