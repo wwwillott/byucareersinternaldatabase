@@ -492,6 +492,43 @@ def submit_edit(table_name):
 
     return redirect(f'/view/{table_name}')
 
+@app.route('/calendar_events')
+def calendar_events():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT EmployerName, EventDate, StartTime, EndTime 
+        FROM InfoSessions
+        WHERE EventDate IS NOT NULL AND StartTime IS NOT NULL
+    """)
+
+    events = []
+    for name, date, start, end in cursor.fetchall():
+        if isinstance(date, datetime):
+            date_str = date.date().isoformat()
+        else:
+            date_str = date.isoformat()
+
+        start_str = f"{date_str}T{start}"
+        end_str = f"{date_str}T{end}" if end else None
+
+        event = {
+            'title': name,
+            'start': start_str
+        }
+        if end_str:
+            event['end'] = end_str
+
+        events.append(event)
+
+    conn.close()
+    return {'events': events}
+
+@app.route('/calendar')
+def calendar_view():
+    return render_template('calendar.html')
+
 @app.route('/konami')
 def konami():
     return render_template('konami.html')

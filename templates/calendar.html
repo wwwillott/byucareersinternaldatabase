@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Calendar{% endblock %}
+
+{% block content %}
+<div id="calendar"></div>
+
+<style>
+  #calendar {
+    max-width: 1100px;
+    margin: 2rem auto;
+    background-color: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const calendarEl = document.getElementById('calendar');
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek'
+      },
+      events: '/calendar_events',  // Flask route that returns JSON data
+      eventClick: function(info) {
+        alert('Event: ' + info.event.title);
+      },
+    });
+
+    calendar.render();
+  });
+</script>
+{% endblock %}
