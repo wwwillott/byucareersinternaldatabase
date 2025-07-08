@@ -16,24 +16,51 @@
   }
 </style>
 
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const calendarEl = document.getElementById('calendar');
+<div class="modal fade" id="eventModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalTitle">Event Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <!-- Event details will go here -->
+      </div>
+    </div>
+  </div>
+</div>
 
-    const calendar = new FullCalendar.Calendar(calendarEl, {
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var calendarEl = document.getElementById('calendar');
+    var calendar = new FullCalendar.Calendar(calendarEl, {
       initialView: 'dayGridMonth',
       headerToolbar: {
         left: 'prev,next today',
         center: 'title',
         right: 'dayGridMonth,timeGridWeek'
       },
-      events: '/calendar_events',  // Flask route that returns JSON data
-      eventClick: function(info) {
-        alert('Event: ' + info.event.title);
-      },
-    });
+      events: '/calendar_events',
+    eventClick: function(info) {
+    const location = info.event.extendedProps.location || 'N/A';
+    const startTime = new Date(info.event.start).toLocaleString();
+    const endTime = info.event.end ? new Date(info.event.end).toLocaleString() : 'TBD';
+    const link = info.event.extendedProps.link || '#';
 
+    document.getElementById('modalTitle').textContent = info.event.title;
+    document.getElementById('modalBody').innerHTML = `
+        <p><strong>Start:</strong> ${startTime}</p>
+        <p><strong>End:</strong> ${endTime}</p>
+        <p><strong>Location:</strong> ${location}</p>
+        <p><a href="${link}" target="_blank" class="btn btn-primary">View in Handshake</a></p>
+    `;
+
+    const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+    modal.show();
+    }
+    });
     calendar.render();
   });
 </script>
 {% endblock %}
+

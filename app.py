@@ -1,6 +1,6 @@
-from flask import Flask, request, render_template, redirect, flash, session, Response
+from flask import Flask, request, render_template, redirect, flash, session, Response, jsonify
 import pymssql  # uses easier connection than pyodbc
-from datetime import datetime
+from datetime import datetime, time
 import csv
 import io
 
@@ -18,6 +18,18 @@ def get_season_background():
         return 'summer.jpg'
     else:
         return 'fall.jpg'
+
+def safe_parse_time(t):
+    if isinstance(t, time):  # already a time object
+        return t.strftime('%H:%M:%S')
+    t = str(t).strip()
+    try:
+        return datetime.strptime(t, '%H:%M:%S').time().strftime('%H:%M:%S')
+    except ValueError:
+        try:
+            return datetime.strptime(t, '%H:%M').time().strftime('%H:%M:%S')
+        except ValueError:
+            return None
 
 def get_connection():
     return pymssql.connect(
@@ -498,32 +510,39 @@ def calendar_events():
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT EmployerName, EventDate, StartTime, EndTime 
+        SELECT EventID, EmployerName, EventDate, StartTime, EndTime , Building, Room
         FROM InfoSessions
         WHERE EventDate IS NOT NULL AND StartTime IS NOT NULL
     """)
 
     events = []
-    for name, date, start, end in cursor.fetchall():
-        if isinstance(date, datetime):
-            date_str = date.date().isoformat()
-        else:
-            date_str = date.isoformat()
+    for event_id, name, date, start, end, building, room in cursor.fetchall():
+        if not date or not start:
+            continue
 
-        start_str = f"{date_str}T{start}"
-        end_str = f"{date_str}T{end}" if end else None
+        date_str = date.isoformat() if isinstance(date, datetime) else str(date)
+        start_str = safe_parse_time(start)
+        end_str = safe_parse_time(end) if end else None
+
+        if not start_str:
+            continue  # skip if we can't parse time
+
+        location = f"{building or ''} {room or ''}".strip()
+        handshake_url = f"https://byu.joinhandshake.com/stu/events/{event_id}"
 
         event = {
             'title': name,
-            'start': start_str
+            'start': f"{date_str}T{start_str}",
+            'location': location,
+            'link': handshake_url
         }
         if end_str:
-            event['end'] = end_str
+            event['end'] = f"{date_str}T{end_str}"
 
         events.append(event)
 
     conn.close()
-    return {'events': events}
+    return jsonify(events)
 
 @app.route('/calendar')
 def calendar_view():
