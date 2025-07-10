@@ -105,22 +105,6 @@ from datetime import datetime, time
 def clean_value(val, col=None):
     if val is None:
         return None
-    
-    # For date columns, handle date objects specially before converting to string
-    if col == 'EventDate':
-        # If it's already a date object, return as is
-        if isinstance(val, date):
-            return val
-        # If it's a datetime object, extract the date part
-        if isinstance(val, datetime):
-            return val.date()
-    
-    # For time columns, handle time objects specially
-    if col in ['StartTime', 'EndTime']:
-        if isinstance(val, time):
-            return val.strftime('%H:%M:%S')
-    
-    # Now convert to string for further processing
     val = str(val).strip()
     if val == '' or val.lower() == 'none':
         return None
@@ -146,24 +130,10 @@ def clean_value(val, col=None):
     
     # For dates like 'EventDate' if needed, convert to datetime.date
     if col == 'EventDate':
-        # If it's already a date object, return as is
-        if isinstance(val, date):
-            return val
-        # If it's a datetime object, extract the date part
-        if isinstance(val, datetime):
-            return val.date()
-        # If it's a string, try to parse it
         try:
             return datetime.strptime(val, "%Y-%m-%d").date()
         except ValueError:
-            try:
-                # Try other common date formats
-                return datetime.strptime(val, "%m/%d/%Y").date()
-            except ValueError:
-                try:
-                    return datetime.strptime(val, "%Y-%m-%d %H:%M:%S").date()
-                except ValueError:
-                    return None
+            return None
     
     return val
 
