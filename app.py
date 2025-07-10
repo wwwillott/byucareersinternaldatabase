@@ -105,6 +105,22 @@ from datetime import datetime, time
 def clean_value(val, col=None):
     if val is None:
         return None
+    
+    # For date columns, handle date objects specially before converting to string
+    if col == 'EventDate':
+        # If it's already a date object, return as is
+        if isinstance(val, date):
+            return val
+        # If it's a datetime object, extract the date part
+        if isinstance(val, datetime):
+            return val.date()
+    
+    # For time columns, handle time objects specially
+    if col in ['StartTime', 'EndTime']:
+        if isinstance(val, time):
+            return val.strftime('%H:%M:%S')
+    
+    # Now convert to string for further processing
     val = str(val).strip()
     if val == '' or val.lower() == 'none':
         return None
@@ -130,10 +146,24 @@ def clean_value(val, col=None):
     
     # For dates like 'EventDate' if needed, convert to datetime.date
     if col == 'EventDate':
+        # If it's already a date object, return as is
+        if isinstance(val, date):
+            return val
+        # If it's a datetime object, extract the date part
+        if isinstance(val, datetime):
+            return val.date()
+        # If it's a string, try to parse it
         try:
             return datetime.strptime(val, "%Y-%m-%d").date()
         except ValueError:
-            return None
+            try:
+                # Try other common date formats
+                return datetime.strptime(val, "%m/%d/%Y").date()
+            except ValueError:
+                try:
+                    return datetime.strptime(val, "%Y-%m-%d %H:%M:%S").date()
+                except ValueError:
+                    return None
     
     return val
 
@@ -148,7 +178,7 @@ def index():
 # Add row routes
 @app.route('/editor/<table_name>')
 def editor(table_name):
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers', 'InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
@@ -168,7 +198,7 @@ def editor(table_name):
 
 @app.route('/add_row/<table_name>', methods=['POST'])
 def add_row(table_name):
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers', 'InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
@@ -200,7 +230,7 @@ def add_row(table_name):
 
 @app.route('/editor_wizard/<table_name>')
 def editor_wizard(table_name):
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers', 'InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
@@ -241,7 +271,7 @@ def editor_wizard(table_name):
 
 @app.route('/advanced_editor/<table_name>')
 def advanced_editor(table_name):
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers', 'InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
     return render_template('advanced_editor.html', table_name=table_name)
@@ -249,7 +279,7 @@ def advanced_editor(table_name):
 # Still add row, but for CSV upload/download functionality
 @app.route('/download_template/<table_name>')
 def download_template(table_name):
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers', 'InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
@@ -280,7 +310,7 @@ def download_template(table_name):
 
 @app.route('/upload_csv/<table_name>', methods=['GET', 'POST'])
 def upload_csv(table_name):
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers', 'InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
@@ -320,7 +350,7 @@ def preview_csv(table_name):
     import csv
     import io
 
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers', 'InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
@@ -420,7 +450,7 @@ def delete_row(EmployerID):
 
 @app.route('/delete_mode/<table_name>')
 def delete_mode(table_name):
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers', 'InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
