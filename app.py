@@ -100,11 +100,23 @@ def normalize_time(value):
             continue
     return None  # invalid format
 
-from datetime import datetime, time
-
 def clean_value(val, col=None):
     if val is None:
         return None
+    
+    # For dates, check if it's already a date object before converting to string
+    if col == 'EventDate':
+        if isinstance(val, date):
+            return val  # Already a date object, return as-is
+        if isinstance(val, datetime):
+            return val.date()  # Convert datetime to date
+    
+    # For times, check if it's already a time object
+    if col in ['StartTime', 'EndTime']:
+        if isinstance(val, time):
+            return val.strftime("%H:%M:%S")
+    
+    # Now convert to string for other processing
     val = str(val).strip()
     if val == '' or val.lower() == 'none':
         return None
