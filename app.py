@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, redirect, flash, session, Response, jsonify
+from flask import Flask, request, render_template, redirect, flash, session, Response, jsonify, url_for
 import pymssql  # uses easier connection than pyodbc
 from datetime import datetime, time, date
 import csv
@@ -7,6 +7,8 @@ import io
 app = Flask(__name__)
 
 app.secret_key = 'supersecretkey'  # Change this to a random secret key in production
+
+#link bit.ly/byucareersdatabase this can be changed using SSO on bitly
 
 def get_season_background():
     month = datetime.now().month
@@ -100,8 +102,6 @@ def normalize_time(value):
             continue
     return None  # invalid format
 
-from datetime import datetime, time
-
 def clean_value(val, col=None):
     if val is None:
         return None
@@ -114,12 +114,6 @@ def clean_value(val, col=None):
         if normalized_time is None:
             return None
         return normalized_time.strftime("%H:%M:%S")
-    
-    if col == 'ArchivedAt':
-        try:
-            return datetime.fromisoformat(val)
-        except ValueError:
-            return None
 
     # Convert numeric columns appropriately (adjust column names if needed)
     if col in ['Attendees']:
@@ -128,12 +122,17 @@ def clean_value(val, col=None):
         except ValueError:
             return None
     
-    # For dates like 'EventDate' if needed, convert to datetime.date
+    # For dates, check if it's already a date object before converting to string
     if col == 'EventDate':
-        try:
-            return datetime.strptime(val, "%Y-%m-%d").date()
-        except ValueError:
-            return None
+        if isinstance(val, date):
+            return val  # Already a date object, return as-is
+        if isinstance(val, datetime):
+            return val.date()  # Convert datetime to date
+
+    # For times, check if it's already a time object  
+    if col in ['StartTime', 'EndTime']:
+        if isinstance(val, time):
+            return val.strftime("%H:%M:%S")
     
     return val
 
@@ -148,7 +147,7 @@ def index():
 # Add row routes
 @app.route('/editor/<table_name>')
 def editor(table_name):
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers', 'InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
@@ -168,7 +167,7 @@ def editor(table_name):
 
 @app.route('/add_row/<table_name>', methods=['POST'])
 def add_row(table_name):
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers', 'InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
@@ -200,7 +199,7 @@ def add_row(table_name):
 
 @app.route('/editor_wizard/<table_name>')
 def editor_wizard(table_name):
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers', 'InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
@@ -241,7 +240,7 @@ def editor_wizard(table_name):
 
 @app.route('/advanced_editor/<table_name>')
 def advanced_editor(table_name):
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers','InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
     return render_template('advanced_editor.html', table_name=table_name)
@@ -249,7 +248,7 @@ def advanced_editor(table_name):
 # Still add row, but for CSV upload/download functionality
 @app.route('/download_template/<table_name>')
 def download_template(table_name):
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers','InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
@@ -280,7 +279,7 @@ def download_template(table_name):
 
 @app.route('/upload_csv/<table_name>', methods=['GET', 'POST'])
 def upload_csv(table_name):
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers','InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
@@ -320,7 +319,7 @@ def preview_csv(table_name):
     import csv
     import io
 
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers','InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
@@ -370,7 +369,7 @@ def preview_csv(table_name):
 def view_table(table_name):
     allowed_tables = ['InfoSessions', 'Interviews', 'Employers', 'InfoSessionsArchive']
     if table_name not in allowed_tables:
-        return "Table not found", 404
+        return "Hey, that's no table! You must've done something wrong...", 404
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -404,7 +403,14 @@ def view_table(table_name):
         selected_columns=selected_columns
     )
 
+@app.route('/toggle_archive/<base_table>')
+def toggle_archive(base_table):
+    session_key = f"{base_table}_archive_mode"
+    session[session_key] = not session.get(session_key, False)
 
+    # Pick the appropriate table name
+    table = f"{base_table}Archive" if session[session_key] else base_table
+    return redirect(url_for('view_table', table_name=table))
 
 # Delete row functionality
 @app.route('/delete/<int:EmployerID>', methods=['POST'])
@@ -420,7 +426,7 @@ def delete_row(EmployerID):
 
 @app.route('/delete_mode/<table_name>')
 def delete_mode(table_name):
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers','InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
@@ -626,37 +632,68 @@ def calendar_events():
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT EventID, EmployerName, EventDate, StartTime, EndTime , Building, Room
-        FROM InfoSessions
-        WHERE EventDate IS NOT NULL AND StartTime IS NOT NULL
-    """)
+    def fetch_events_from(table_name):
+        cursor.execute(f"""
+            SELECT EventID, EmployerName, EventDate, StartTime, EndTime, Building, Room
+            FROM {table_name}
+            WHERE EventDate IS NOT NULL
+        """)
+        results = []
+        for event_id, name, date, start, end, building, room in cursor.fetchall():
+            if not date:
+                continue
 
-    events = []
-    for event_id, name, date, start, end, building, room in cursor.fetchall():
-        if not date or not start:
-            continue
+            # Convert date to ISO string (YYYY-MM-DD)
+            if isinstance(date, datetime):
+                date_only = date.date()
+            else:
+                date_only = date
 
-        date_str = date.isoformat() if isinstance(date, datetime) else str(date)
-        start_str = safe_parse_time(start)
-        end_str = safe_parse_time(end) if end else None
+            # Compose start datetime string combining date + time
+            if start is None:
+                start_str = None
+            else:
+                # start may be a time object or string; convert to string "HH:MM:SS"
+                if isinstance(start, (datetime, )):
+                    start_time_str = start.time().isoformat()
+                elif isinstance(start, str):
+                    start_time_str = start
+                else:
+                    start_time_str = str(start)
 
-        if not start_str:
-            continue  # skip if we can't parse time
+                start_str = f"{date_only}T{start_time_str}"
 
-        location = f"{building or ''} {room or ''}".strip()
-        handshake_url = f"https://byu.joinhandshake.com/stu/events/{event_id}"
+            # Same for end time if exists
+            if end is None:
+                end_str = None
+            else:
+                if isinstance(end, (datetime, )):
+                    end_time_str = end.time().isoformat()
+                elif isinstance(end, str):
+                    end_time_str = end
+                else:
+                    end_time_str = str(end)
+                end_str = f"{date_only}T{end_time_str}"
 
-        event = {
-            'title': name,
-            'start': f"{date_str}T{start_str}",
-            'location': location,
-            'link': handshake_url
-        }
-        if end_str:
-            event['end'] = f"{date_str}T{end_str}"
+            location = f"{building or ''} {room or ''}".strip()
+            handshake_url = f"https://byu.joinhandshake.com/stu/events/{event_id}"
 
-        events.append(event)
+
+            event = {
+                'title': name,
+                'start': start_str,
+                'location': location,
+                'link': handshake_url
+            }
+            if end_str:
+                event['end'] = end_str
+
+            results.append(event)
+        return results
+
+
+    # Combine events from both tables
+    events = fetch_events_from("InfoSessions") + fetch_events_from("InfoSessionsArchive")
 
     conn.close()
     return jsonify(events)
@@ -764,7 +801,6 @@ def internal_server_error(e):
     return render_template('403.html'), 403
 
 def archive_old_sessions():
-    from datetime import date
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -781,16 +817,36 @@ def archive_old_sessions():
     print(f"Archiving {len(old_rows)} old session(s)...")
 
     for row in old_rows:
+        (
+            event_id, employer_name, event_date,
+            start_time, end_time, building, room,
+            major_group, food, notes
+        ) = row
+
+        # Explicit type enforcement to avoid implicit conversion to 1900
+        event_date = event_date if isinstance(event_date, date) else None
+        start_time = start_time if isinstance(start_time, time) else (
+            start_time.time() if isinstance(start_time, datetime) else None
+        )
+        end_time = end_time if isinstance(end_time, time) else (
+            end_time.time() if isinstance(end_time, datetime) else None
+        )
+
         # Insert into archive with NULL Attendees and Debrief
         cursor.execute("""
             INSERT INTO InfoSessionsArchive (
-                EventID, EmployerName, EventDate, StartTime, EndTime, Building, Room, MajorGroup, Food, Notes,
+                EventID, EmployerName, EventDate, StartTime, EndTime,
+                Building, Room, MajorGroup, Food, Notes,
                 Attendees, Debrief
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NULL, NULL)
-        """, row)
+        """, (
+            event_id, employer_name, event_date,
+            start_time, end_time, building, room,
+            major_group, food, notes
+        ))
 
         # Delete from main table
-        cursor.execute("DELETE FROM InfoSessions WHERE EventID = %s", (row[0],))
+        cursor.execute("DELETE FROM InfoSessions WHERE EventID = %s", (event_id,))
 
     conn.commit()
     conn.close()

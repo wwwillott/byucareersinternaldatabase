@@ -21,6 +21,16 @@
         Filter Columns
       </button>
       <a href="/delete_mode/{{ table_name }}" class="btn btn-danger me-1">Delete Mode</a>
+      {% if 'Archive' in table_name %}
+        <a href="{{ url_for('view_table', table_name=table_name.replace('Archive', '')) }}" class="btn btn-outline-info">
+          View Current {{ table_name.replace('Archive', '') }}
+        </a>
+      {% else %}
+        <a href="{{ url_for('view_table', table_name=table_name ~ 'Archive') }}" class="btn btn-outline-info">
+          View Archived {{ table_name }}
+        </a>
+      {% endif %}
+      </a>
     </div>
   </div>
 
