@@ -1,3 +1,5 @@
+<!-- File: templates/two_week_preview.html -->
+<!-- This file may be retired shortly. -->
 {% extends "base.html" %}
 {% block title %}Two Week Preview{% endblock %}
 {% block content %}
@@ -8,7 +10,8 @@
   <label for="majorGroupFilter">Filter by Major Group:</label>
   <select id="majorGroupFilter" class="form-select d-inline-block w-auto">
     <option value="">All</option>
-    <option value="Engineering">Civil and Construction</option>
+    <option value="CivilandConstruction">Civil and Construction</option>
+    <option value="Mathematics">Mathematics</option>
     <!-- Add more options as needed -->
   </select>
 </div>
@@ -42,35 +45,49 @@
         right: ''
       },
       visibleRange: function(currentDate) {
-        let today = new Date(currentDate);
-        let day = today.getDay();
-
+        let day = currentDate.getDay();
         let diffToMonday = (day === 0 ? -6 : 1) - day;
 
-        let monday = new Date(today);
-        monday.setDate(today.getDate() + diffToMonday);
+        let monday = new Date(currentDate);
+        monday.setDate(currentDate.getDate() + diffToMonday);
 
-        // Next Friday is 9 days after Monday
-        let friday = new Date(monday);
-        friday.setDate(monday.getDate() + 9);
+        // Add 14 days from Monday for a full 2-week period
+        let end = new Date(monday);
+        end.setDate(monday.getDate() + 14);
 
-        let dayAfterFriday = new Date(friday);
-        dayAfterFriday.setDate(friday.getDate() + 1);
-
-        return { start: monday.toISOString().split('T')[0], end: dayAfterFriday.toISOString().split('T')[0] };
+        return {
+          start: monday.toISOString().split('T')[0],
+          end: end.toISOString().split('T')[0]
+        };
       },
       events: function(fetchInfo, successCallback, failureCallback) {
         const group = groupFilter.value;
-        let url = '/two_week_preview_events';
-        if (group) url += `?major_group=${encodeURIComponent(group)}`;
+        const params = new URLSearchParams();
 
-        fetch(url)
+        params.append('start', fetchInfo.startStr);
+        params.append('end', fetchInfo.endStr);
+        if (group) {
+          params.append('major_group', group);
+        }
+
+        fetch(`/two_week_preview_events?${params.toString()}`)
           .then(response => response.json())
-          .then(data => successCallback(data))
-          .catch(error => failureCallback(error));
+          .then(data => {
+            console.log("✅ Events fetched:", data.events);
+            successCallback(data.events);  // NOTE: data.events, not just data
+          })
+          .catch(error => {
+            console.error("❌ Error fetching events:", error);
+            failureCallback(error);
+          });
       },
       eventClick: function(info) {
-        alert('Event: ' + info.event.title);
+        const link = info.event.extendedProps.link;
+        if (link) {
+          window.open(link, "_blank");
+        } else {
+          alert('Event: ' + info.event.title);
+        }
       }
     });
 

@@ -1,6 +1,6 @@
 from flask import Flask, request, render_template, redirect, flash, session, Response, jsonify
 import pymssql  # uses easier connection than pyodbc
-from datetime import datetime, time
+from datetime import datetime, time, date
 import csv
 import io
 
@@ -31,6 +31,38 @@ def safe_parse_time(t):
         except ValueError:
             return None
 
+def archive_past_infosessions():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Select past sessions
+    cursor.execute("""
+        SELECT EventID, EmployerName, EventDate, StartTime, EndTime, Building, Room, Food, MajorGroup
+        FROM InfoSessions
+        WHERE EventDate < %s
+    """, (date.today(),))
+
+    rows = cursor.fetchall()
+
+    # Insert into archive
+    for row in rows:
+        cursor.execute("""
+            INSERT INTO InfoSessionsArchive (
+                EventID, EmployerName, EventDate, StartTime, EndTime,
+                Building, Room, Food, MajorGroup,
+                Attendees, Debrief
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NULL, NULL)
+        """, row)
+
+    # Delete from original
+    cursor.execute("""
+        DELETE FROM InfoSessions WHERE EventDate < %s
+    """, (date.today(),))
+
+    conn.commit()
+    conn.close()
+
+# Helpful functions for database connections and data cleaning
 def get_connection():
     return pymssql.connect(
         server='byucareerservices.database.windows.net',
@@ -56,38 +88,64 @@ def get_primary_key_column(table_name):
     return result[0] if result else None
 
 def normalize_time(value):
-    """Convert HH:MM or HH:MM:SS to HH:MM:SS; returns None if invalid or empty"""
+    """Convert HH:MM or HH:MM:SS string to a Python time object; returns None if invalid or empty"""
     value = value.strip()
     if not value:
         return None
-    try:
-        # Try HH:MM format
-        return datetime.strptime(value, "%H:%M").time().strftime("%H:%M:%S")
-    except ValueError:
+    for fmt in ("%H:%M", "%H:%M:%S"):
         try:
-            # Try HH:MM:SS format
-            return datetime.strptime(value, "%H:%M:%S").time().strftime("%H:%M:%S")
+            dt = datetime.strptime(value, fmt)
+            return dt.time()  # Return Python time object
         except ValueError:
-            return None  # Or raise an error/flash message
-        
+            continue
+    return None  # invalid format
+
+from datetime import datetime, time
+
 def clean_value(val, col=None):
     if val is None:
         return None
     val = str(val).strip()
     if val == '' or val.lower() == 'none':
         return None
+    
     if col in ['StartTime', 'EndTime']:
-        normalized = normalize_time(val)
-        if normalized is None:
-            # You could also flash here or raise error if you want strict validation
+        normalized_time = normalize_time(val)  # This returns a datetime.time object or None
+        if normalized_time is None:
             return None
-        return normalized
+        return normalized_time.strftime("%H:%M:%S")
+    
+    if col == 'ArchivedAt':
+        try:
+            return datetime.fromisoformat(val)
+        except ValueError:
+            return None
+
+    # Convert numeric columns appropriately (adjust column names if needed)
+    if col in ['Attendees']:
+        try:
+            return int(val)
+        except ValueError:
+            return None
+    
+    # For dates like 'EventDate' if needed, convert to datetime.date
+    if col == 'EventDate':
+        try:
+            return datetime.strptime(val, "%Y-%m-%d").date()
+        except ValueError:
+            return None
+    
     return val
 
+
+#Homepage
 @app.route('/')
 def index():
     return render_template('index.html')
 
+
+
+# Add row routes
 @app.route('/editor/<table_name>')
 def editor(table_name):
     allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
@@ -188,6 +246,7 @@ def advanced_editor(table_name):
         return "Table not found", 404
     return render_template('advanced_editor.html', table_name=table_name)
 
+# Still add row, but for CSV upload/download functionality
 @app.route('/download_template/<table_name>')
 def download_template(table_name):
     allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
@@ -255,7 +314,6 @@ def upload_csv(table_name):
 
     return redirect(f'/view/{table_name}')
 
-
 @app.route('/preview_csv/<table_name>', methods=['POST'])
 def preview_csv(table_name):
     from flask import session, flash, redirect, url_for
@@ -305,9 +363,12 @@ def preview_csv(table_name):
 
     return render_template('csv_preview.html', table_name=table_name, headers=headers, rows=data)
 
+
+
+# Table viewer route
 @app.route('/view/<table_name>', methods=['GET', 'POST'])
 def view_table(table_name):
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers', 'InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
@@ -343,6 +404,9 @@ def view_table(table_name):
         selected_columns=selected_columns
     )
 
+
+
+# Delete row functionality
 @app.route('/delete/<int:EmployerID>', methods=['POST'])
 def delete_row(EmployerID):
     conn = get_connection()
@@ -378,13 +442,11 @@ def delete_mode(table_name):
     conn.close()
     return render_template('delete_mode.html', table_name=table_name, columns=columns, rows=rows, pk_column=pk_column)
 
-
 @app.route('/confirm_delete/<table_name>', methods=['POST'])
 def confirm_delete(table_name):
     row_ids = request.form.getlist('row_ids')
     pk_column = request.form.get('pk_column')
     return render_template('confirm_delete.html', table_name=table_name, row_ids=row_ids, pk_column=pk_column)
-
 
 @app.route('/final_delete/<table_name>', methods=['POST'])
 def final_delete(table_name):
@@ -409,9 +471,12 @@ def final_delete(table_name):
 
     return redirect(f'/view/{table_name}')
 
+
+
+# Edit row functionality
 @app.route('/edit_mode/<table_name>', methods=['GET', 'POST'])
 def edit_mode(table_name):
-    allowed_tables = ['InfoSessions', 'Interviews', 'Employers']
+    allowed_tables = ['InfoSessions', 'Interviews', 'Employers', 'InfoSessionsArchive']
     if table_name not in allowed_tables:
         return "Table not found", 404
 
@@ -433,7 +498,7 @@ def edit_mode(table_name):
 
     return render_template('edit_mode.html', table_name=table_name, columns=columns, rows=rows, pk_column=pk_column)
 
-@app.route('/edit_row_form/<table_name>', methods=['POST'])
+@app.route('/edit_row_form/<table_name>', methods=['GET','POST'])
 def edit_row_form(table_name):
     row_id = request.form.get('row_id')
     pk_column = request.form.get('pk_column')
@@ -463,15 +528,28 @@ def edit_row_form(table_name):
 
 @app.route('/submit_edit/<table_name>', methods=['POST'])
 def submit_edit(table_name):
+    print("DEBUG: submit_edit route hit!")
+    
     pk_column = request.form.get('pk_column')
     row_id = request.form.get('row_id')
 
     if not pk_column or not row_id:
-        return redirect(f'/view/{table_name}')
+        print("DEBUG: Missing pk_column or row_id, redirecting back.")
+        return redirect(f'/edit_mode/{table_name}')
+
+    # Try converting row_id to int if possible (adjust if your PK is not int)
+    try:
+        row_id_int = int(row_id)
+        print(f"DEBUG: Converted row_id to int: {row_id_int}")
+    except Exception as e:
+        print(f"DEBUG ERROR: Cannot convert row_id to int: {e}")
+        # If your PK is string, you can just keep row_id as is
+        row_id_int = row_id  # fallback
 
     conn = get_connection()
     cursor = conn.cursor()
 
+    # Fetch columns BEFORE accessing form data
     cursor.execute(f"""
         SELECT COLUMN_NAME 
         FROM INFORMATION_SCHEMA.COLUMNS 
@@ -479,31 +557,70 @@ def submit_edit(table_name):
         ORDER BY ORDINAL_POSITION
     """)
     columns = [row[0] for row in cursor.fetchall()]
+    print(f"DEBUG: Columns in table: {columns}")
 
-    # Build update query
+    print("---- FORM DATA ----")
+    for col in columns:
+        val = request.form.get(col)
+        print(f"{col}: {val}")
+
+    # Build update clauses and values list for SQL
     update_clauses = []
     values = []
 
     for col in columns:
         if col == pk_column:
-            continue
-        update_clauses.append(f"[{col}] = %s")
+            continue  # skip PK in update set
         raw_value = request.form.get(col, '')
-        cleaned_val = clean_value(raw_value, col)
-        if cleaned_val is None and raw_value.strip() != '':
-            flash(f"Invalid value for {col}.", 'danger')
-            return redirect(request.referrer)
+        cleaned_val = clean_value(raw_value, col)  # call your existing function
+
+        # If clean_value returned a datetime.time object, convert to string for SQL
+        if hasattr(cleaned_val, 'strftime'):
+            cleaned_val = cleaned_val.strftime("%H:%M:%S")
+
+        update_clauses.append(f"[{col}] = %s")
         values.append(cleaned_val)
 
-    values.append(row_id)
+    # Append the PK value for the WHERE clause
+    values.append(row_id_int)
 
     query = f"UPDATE {table_name} SET {', '.join(update_clauses)} WHERE [{pk_column}] = %s"
-    cursor.execute(query, values)
-    conn.commit()
-    conn.close()
 
-    return redirect(f'/view/{table_name}')
+    print(f"DEBUG: Executing query:\n{query}\nWith values:\n{values}")
 
+    try:
+        cursor.execute(query, values)
+        print(f"DEBUG: Rows affected: {cursor.rowcount}")
+        conn.commit()
+    except Exception as e:
+        print(f"DEBUG ERROR: Exception executing update: {e}")
+        flash(f"Database error: {e}", 'danger')
+        conn.rollback()
+    finally:
+        conn.close()
+
+    return redirect(f'/edit_mode/{table_name}')
+
+
+@app.route('/test_update')
+def test_update():
+    conn = get_connection()
+    cursor = conn.cursor()
+    test_pk = 123  # your sample PK
+    try:
+        cursor.execute("UPDATE InfoSessionsArchive SET Notes = 'Test update' WHERE [EventID] = %s", (test_pk,))
+        conn.commit()
+        affected = cursor.rowcount
+    except Exception as e:
+        conn.rollback()
+        return f"Error during test update: {e}"
+    finally:
+        conn.close()
+    return f"Test update complete, rows affected: {affected}"
+
+
+
+# Calendar display routes
 @app.route('/calendar_events')
 def calendar_events():
     conn = get_connection()
@@ -552,31 +669,46 @@ def calendar_view():
 def two_week_preview_events():
     from datetime import datetime, timedelta
     major_group = request.args.get('major_group')
+    start = request.args.get('start')
+    end = request.args.get('end')
 
+    if not start or not end:
+        return jsonify([])
+    
     conn = get_connection()
     cursor = conn.cursor()
-
-    today = datetime.today().date()
-    end_date = today + timedelta(days=14)
 
     query = """
         SELECT EventID, EmployerName, EventDate, StartTime, EndTime, Building, Room, MajorGroup
         FROM InfoSessions
         WHERE EventDate BETWEEN %s AND %s
     """
-    params = [today, end_date]
+    params = [start, end]
 
     if major_group:
         query += " AND MajorGroup = %s"
         params.append(major_group)
 
     cursor.execute(query, tuple(params))
+    rows = cursor.fetchall()
+    if not rows:
+        return jsonify([])
+    
+    #debugs
+    print("Query params:", start, end)
+    print("Row count:", cursor.rowcount)
+    print("First 3 rows:", rows[:3])
 
     events = []
-    for event_id, name, date, start, end, building, room, group in cursor.fetchall():
+    for event_id, name, date, start, end, building, room, group in rows:
+        print(f"🔹 Raw row: {event_id}, {name}, {date}, {start}, {end}, {building}, {room}, {group}")
+    
         start_time_str = safe_parse_time(start) if start else "00:00:00"
-        end_time_str = safe_parse_time(end) if end else None
+        if not start_time_str:
+            print(f"❌ Could not parse start time: {start}")
+            continue
 
+        end_time_str = safe_parse_time(end) if end else None
         start_str = f"{date}T{start_time_str}"
         end_str = f"{date}T{end_time_str}" if end_time_str else None
 
@@ -596,13 +728,20 @@ def two_week_preview_events():
 
         events.append(event)
 
+    # dEBUG
+    import pprint
+    pprint.pprint(events)
+
     conn.close()
-    return jsonify(events)
+    return jsonify(events=events)
 
 @app.route('/two_week_preview')
 def two_week_preview():
     return render_template('two_week_preview.html')
 
+
+
+# Fun stuff
 @app.route('/konami')
 def konami():
     return render_template('konami.html')
@@ -611,6 +750,7 @@ def konami():
 def inject_background_image():
     return dict(background_image=get_season_background())
 
+# Custom Error handlers
 @app.errorhandler(500)
 def internal_server_error(e):
     return render_template('500.html'), 500
@@ -623,7 +763,40 @@ def internal_server_error(e):
 def internal_server_error(e):
     return render_template('403.html'), 403
 
+def archive_old_sessions():
+    from datetime import date
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    today = date.today()
+
+    # Fetch rows with past dates
+    cursor.execute("""
+        SELECT EventID, EmployerName, EventDate, StartTime, EndTime, Building, Room, MajorGroup, Food, Notes
+        FROM InfoSessions
+        WHERE EventDate < %s
+    """, (today,))
+    old_rows = cursor.fetchall()
+
+    print(f"Archiving {len(old_rows)} old session(s)...")
+
+    for row in old_rows:
+        # Insert into archive with NULL Attendees and Debrief
+        cursor.execute("""
+            INSERT INTO InfoSessionsArchive (
+                EventID, EmployerName, EventDate, StartTime, EndTime, Building, Room, MajorGroup, Food, Notes,
+                Attendees, Debrief
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NULL, NULL)
+        """, row)
+
+        # Delete from main table
+        cursor.execute("DELETE FROM InfoSessions WHERE EventID = %s", (row[0],))
+
+    conn.commit()
+    conn.close()
+
 if __name__ == '__main__':
+    archive_old_sessions()  # Archive old sessions on startup
     import os
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)

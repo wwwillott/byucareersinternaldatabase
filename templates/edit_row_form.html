@@ -12,11 +12,14 @@
       <label class="form-label">{{ columns[i] }}</label>
       {% if columns[i] == pk_column %}
         <input class="form-control" type="text" name="{{ columns[i] }}" value="{{ row[i] }}" readonly>
+      {% elif columns[i]|lower == 'debrief' %}
+        <textarea class="form-control" name="{{ columns[i] }}" rows="5">{{ row[i] }}</textarea>
       {% else %}
         <input class="form-control" type="text" name="{{ columns[i] }}" value="{{ row[i] }}">
       {% endif %}
     </div>
   {% endfor %}
+  
   <button type="submit" class="btn btn-success">Submit Edits</button>
   <a href="/edit_mode/{{ table_name }}" class="btn btn-secondary">Cancel</a>
 </form>

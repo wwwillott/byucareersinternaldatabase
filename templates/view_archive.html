@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}{{ table_name }} Viewer{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>{{ table_name }} Table Viewer</h2>
+    <div>
+      <a href="/edit_mode/{{ table_name }}?row_id={{ row[pk_index] }}&pk_column={{ pk_column }}" class="btn btn-outline-warning me-1">Edit Row</a>
+      <button class="btn btn-outline-secondary me-1" type="button" data-bs-toggle="collapse" data-bs-target="#columnDrawer" aria-expanded="false" aria-controls="columnDrawer">
+        Filter Columns
+      </button>
+      <a href="/delete_mode/{{ table_name }}" class="btn btn-danger me-1">Delete Mode</a>
+    </div>
+  </div>
+
+  <div class="collapse mb-4" id="columnDrawer">
+    <div class="card card-body border-secondary">
+      <form method="POST">
+        <div class="row">
+          {% for column in all_columns %}
+            <div class="form-check col-md-3">
+              <input class="form-check-input" type="checkbox" name="columns" value="{{ column }}" id="check_{{ column }}"
+                     {% if column in selected_columns %}checked{% endif %}>
+              <label class="form-check-label" for="check_{{ column }}">{{ column }}</label>
+            </div>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-success mt-3">Apply Filters</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-bordered table-striped table-hover align-middle">
+      <thead class="table-dark">
+        <tr>
+          {% for column in columns %}
+            <th scope="col">{{ column }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            {% for cell in row %}
+              <td>{{ cell }}</td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <button id="downloadExcel" class="btn btn-outline-success mb-3 ms-2">Download Excel</button>
+  <button id="downloadCSV" class="btn btn-outline-primary mb-3">Download CSV</button>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  document.getElementById('downloadCSV')?.addEventListener('click', () => {
+    const table = document.querySelector('table');
+    if (!table) return;
+
+    let csv = [];
+
+    // Get headers
+    const headers = Array.from(table.querySelectorAll('thead th'))
+      .map(th => `"${th.textContent.trim()}"`);
+    csv.push(headers.join(','));
+
+    // Get only visible rows
+    const visibleRows = Array.from(table.querySelectorAll('tbody tr'))
+      .filter(row => row.offsetParent !== null);
+
+    for (const row of visibleRows) {
+      const cells = Array.from(row.querySelectorAll('td'))
+        .map(td => `"${td.textContent.trim().replace(/\n/g, ' ').replace(/"/g, '""')}"`);
+      csv.push(cells.join(','));
+    }
+
+    const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = '{{ table_name }}_results.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const excelBtn = document.getElementById('downloadExcel');
+    if (!excelBtn) return;
+
+    excelBtn.addEventListener('click', () => {
+      const table = document.querySelector('table');
+      if (!table) return;
+
+      const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
+      const visibleRows = Array.from(table.querySelectorAll('tbody tr'))
+        .filter(row => row.offsetParent !== null)
+        .map(row => Array.from(row.querySelectorAll('td')).map(td => td.textContent.trim()));
+
+      const data = [headers, ...visibleRows];
+      const worksheet = XLSX.utils.aoa_to_sheet(data);
+
+      const range = XLSX.utils.decode_range(worksheet['!ref']);
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
+        if (!worksheet[cellAddress]) continue;
+
+        worksheet[cellAddress].s = {
+          font: { bold: true, color: { rgb: "FFFFFFFF" } },
+          fill: { fgColor: { rgb: "FF4F81BD" } },
+          alignment: { horizontal: "center", vertical: "center" }
+        };
+      }
+
+      const colWidths = headers.map((_, colIndex) => {
+        let maxLength = headers[colIndex].length;
+        visibleRows.forEach(row => {
+          if (row[colIndex] && row[colIndex].length > maxLength)
+            maxLength = row[colIndex].length;
+        });
+        return { wch: maxLength + 2 };
+      });
+      worksheet['!cols'] = colWidths;
+      worksheet['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "{{ table_name }}");
+      XLSX.writeFile(workbook, "{{ table_name }}_results.xlsx");
+    });
+  });
+</script>
+{% endblock %}
