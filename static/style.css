@@ -90,3 +90,21 @@ html, body {
   color: #ffffffc2;
   cursor: pointer;
 }
+
+#column_suggestions {
+  max-width: 100%;
+  max-height: 150px;
+  overflow-y: auto;
+  border: 1px solid #ced4da;
+  border-top: none;
+  background-color: white;
+  display: none;
+  position: absolute;
+  width: 100%;
+  z-index: 1000;
+  cursor: pointer;
+}
+
+.position-relative {
+  position: relative;
+}

@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Search All{% endblock %}
+
+{% block content %}
+<h2>Search All Tables</h2>
+<form method="POST" class="mb-3">
+  <div class="row">
+    <div class="col-md-6">
+      <input type="text" name="query" value="{{ query or '' }}" class="form-control" placeholder="Enter keyword...">
+    </div>
+    <div class="col-md-4">
+      <select name="table_filter" class="form-select">
+        <option value="">All Tables</option>
+        {% for tbl in ['InfoSessions', 'Interviews', 'Employers', 'InfoSessionsArchive'] %}
+          <option value="{{ tbl }}" {% if selected_table == tbl %}selected{% endif %}>{{ tbl }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <button class="btn btn-primary w-100" type="submit">Search</button>
+    </div>
+  </div>
+
+  <!-- Filters Drawer -->
+  <div class="collapse mt-3" id="filtersDrawer">
+    <div class="card card-body border-secondary">
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <label for="start_date">Start Date:</label>
+          <input type="date" id="start_date" name="start_date" class="form-control"
+                 value="{{ start_date or '' }}">
+        </div>
+        <div class="col-md-6">
+          <label for="end_date">End Date:</label>
+          <input type="date" id="end_date" name="end_date" class="form-control"
+                 value="{{ end_date or '' }}">
+        </div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-md-6 position-relative">
+            <label for="search_column">Search Column:</label>
+            <input type="text" id="search_column" name="search_column" class="form-control" autocomplete="off"
+                value="{{ search_column }}">
+            <div id="column_suggestions" class="list-group" style="z-index: 1000;"></div>
+        </div>
+        <div class="col-md-6">
+            <label for="search_text">Search Text:</label>
+            <input type="text" id="search_text" name="search_text" class="form-control"
+                value="{{ search_text }}">
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+
+<!-- Toggle button above results -->
+<button class="btn btn-outline-secondary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#filtersDrawer">
+  Filters
+</button>
+
+
+
+{% if selected_table %}
+  {# Single table filtered: show one results table #}
+  {% if results %}
+    <h3>Results from {{ selected_table }}</h3>
+    <div class="table-responsive mt-4">
+      <table class="table table-bordered">
+        <thead class="table-light">
+          <tr>
+            {% for key in results[0].keys() %}
+              <th>{{ key }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in results %}
+            <tr>
+              {% for cell in row.values() %}
+                <td>{{ cell }}</td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p>No results found for "{{ selected_table }}".</p>
+  {% endif %}
+{% else %}
+  {# No filter, show stacked tables for InfoSessions and Interviews #}
+  <h3>Info Sessions</h3>
+  {% if info_sessions_results %}
+    <div class="table-responsive mt-4">
+      <table class="table table-bordered">
+        <thead class="table-light">
+          <tr>
+            {% for key in info_sessions_results[0].keys() %}
+              <th>{{ key }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in info_sessions_results %}
+            <tr>
+              {% for cell in row.values() %}
+                <td>{{ cell }}</td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p>No Info Sessions results found.</p>
+  {% endif %}
+
+  <h3>Interviews</h3>
+  {% if interviews_results %}
+    <div class="table-responsive mt-4">
+      <table class="table table-bordered">
+        <thead class="table-light">
+          <tr>
+            {% for key in interviews_results[0].keys() %}
+              <th>{{ key }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in interviews_results %}
+            <tr>
+              {% for cell in row.values() %}
+                <td>{{ cell }}</td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p>No Interviews results found.</p>
+  {% endif %}
+{% endif %}
+
+<script>
+  const allColumns = JSON.parse('{{ all_columns | safe }}');
+
+  const input = document.getElementById('search_column');
+  const suggestionBox = document.getElementById('column_suggestions');
+
+  input.addEventListener('input', () => {
+    const query = input.value.toLowerCase();
+    suggestionBox.innerHTML = '';
+
+    if (!query) {
+      suggestionBox.style.display = 'none';
+      return;
+    }
+
+    const filtered = allColumns.filter(col => col.toLowerCase().startsWith(query)).slice(0, 5);
+
+    if (filtered.length === 0) {
+      suggestionBox.style.display = 'none';
+      return;
+    }
+
+    filtered.forEach(col => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'list-group-item list-group-item-action';
+      item.textContent = col;
+      item.addEventListener('click', () => {
+        input.value = col;
+        suggestionBox.innerHTML = '';
+        suggestionBox.style.display = 'none';
+      });
+      suggestionBox.appendChild(item);
+    });
+
+    suggestionBox.style.display = 'block';
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!input.contains(e.target) && !suggestionBox.contains(e.target)) {
+      suggestionBox.innerHTML = '';
+      suggestionBox.style.display = 'none';
+    }
+  });
+</script>
+
+
+{% endblock %}

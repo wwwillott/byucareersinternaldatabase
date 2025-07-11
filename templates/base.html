@@ -92,8 +92,14 @@
       </a>
       <ul class="nav nav-pills flex-column mb-auto text-center">
         <li class="tooltip-container">
+          <a href="{{ url_for('search_all') }}" class="nav-link text-white" title="Search All">
+            <i class="bi bi-search"></i>
+          </a>
+          <span class="tooltip-text">Search</span>
+        </li>
+        <li class="tooltip-container">
           <a href="{{ url_for('view_table', table_name='InfoSessions') }}" class="nav-link text-white">
-            <i class="bi bi-calendar-check"></i>
+            <i class="bi bi-people"></i>
           </a>
           <span class="tooltip-text">Info Sessions</span>
         </li>
@@ -102,12 +108,6 @@
             <i class="bi bi-briefcase"></i>
           </a>
           <span class="tooltip-text">Interviews</span>
-        </li>
-        <li class="tooltip-container">
-          <a href="{{ url_for('view_table', table_name='Employers') }}" class="nav-link text-white">
-            <i class="bi bi-people"></i>
-          </a>
-          <span class="tooltip-text">Employers</span>
         </li>
         <li class="tooltip-container">
           <a href="{{ url_for('calendar_view') }}" class="nav-link text-white">

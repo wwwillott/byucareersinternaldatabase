@@ -3,6 +3,7 @@ import pymssql  # uses easier connection than pyodbc
 from datetime import datetime, time, date
 import csv
 import io
+import json
 
 app = Flask(__name__)
 
@@ -137,11 +138,134 @@ def clean_value(val, col=None):
     return val
 
 
-#Homepage
+# Homepage
 @app.route('/')
 def index():
     return render_template('index.html')
 
+# Helper function to get input from form or query parameters
+def get_input(name, default=''):
+    return request.form.get(name, request.args.get(name, default)).strip()
+
+# Search functionality
+@app.route('/search_all', methods=['GET', 'POST'])
+def search_all():
+    query = get_input('query')
+    selected_table = get_input('table_filter')
+    start_date = get_input('start_date')
+    end_date = get_input('end_date')
+    search_column = get_input('search_column')
+    search_text = get_input('search_text')
+
+    # Convert dates if valid
+    try:
+        start_date_parsed = datetime.strptime(start_date, '%Y-%m-%d').date() if start_date else None
+    except ValueError:
+        start_date_parsed = None
+
+    try:
+        end_date_parsed = datetime.strptime(end_date, '%Y-%m-%d').date() if end_date else None
+    except ValueError:
+        end_date_parsed = None
+
+    # If no filter, search just InfoSessions and Interviews separately
+    if not selected_table:
+        tables = ['InfoSessions', 'Interviews']
+    else:
+        tables = [selected_table]
+
+    # Prepare results containers
+    info_sessions_results = []
+    interviews_results = []
+    other_results = []  # For other tables if filtered
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    for tbl in tables:
+        cursor.execute(f"SELECT * FROM {tbl}")
+        columns = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+
+        for row in rows:
+            row_dict = dict(zip(columns, row))
+
+            # Match text search
+            if query and not any(query.lower() in str(v).lower() for v in row_dict.values()):
+                continue
+
+            # Match specific column search
+            if search_column and search_text:
+                if search_column not in row_dict:
+                    continue
+                if search_text.lower() not in str(row_dict[search_column]).lower():
+                    continue
+
+            # Match date filter - try known date-related columns
+            for date_col in ['EventDate', 'StartDate', 'EndDate']:
+                if date_col in row_dict:
+                    date_val = row_dict[date_col]
+                    if isinstance(date_val, datetime):
+                        date_val = date_val.date()
+                    elif not isinstance(date_val, date):
+                        continue
+
+                    if start_date_parsed and date_val < start_date_parsed:
+                        continue
+                    if end_date_parsed and date_val > end_date_parsed:
+                        continue
+                    break  # matched a valid date column, no need to keep checking
+            else:
+                # If none of the date columns exist or match, skip
+                if start_date_parsed or end_date_parsed:
+                    continue
+
+            # Append results based on table
+            if tbl == 'InfoSessions':
+                info_sessions_results.append(row_dict)
+            elif tbl == 'Interviews':
+                interviews_results.append(row_dict)
+            else:
+                other_results.append(row_dict)
+
+    conn.close()
+
+    # If filtered to one table other than InfoSessions/Interviews, show single results table
+    if selected_table and selected_table not in ['InfoSessions', 'Interviews']:
+        return render_template(
+            'search.html',
+            results=other_results,
+            query=query,
+            selected_table=selected_table,
+            start_date=start_date,
+            end_date=end_date,
+            search_column=search_column,
+            search_text=search_text
+        )
+
+    columns_for_autocomplete = [
+        'EventID','EmployerName','Weekday','EventDate','StartTime','EndTime',
+        'Building','Room','StudentHost','ContactName','ContactEmail','ContactPhone',
+        'Food','Majors','PreferredLocation','Notes','MajorGroup','Attendees','Debrief',
+        'InterviewID','RoomCount','RoomType','InterviewerName','InterviewerEmail','PrintedLogo',
+        # add any other relevant column names here
+    ]
+
+    safe_columns_json = json.dumps(columns_for_autocomplete).replace("'", "\\'")
+
+    # Else show separate results for InfoSessions and Interviews if no filter or filter on those two
+    return render_template(
+        'search.html',
+        info_sessions_results=info_sessions_results,
+        interviews_results=interviews_results,
+        query=query,
+        selected_table=selected_table,
+        start_date=start_date,
+        end_date=end_date,
+        search_column=search_column,
+        search_text=search_text,
+        all_columns=safe_columns_json
+    )
 
 
 # Add row routes
@@ -639,15 +763,15 @@ def calendar_events():
             WHERE EventDate IS NOT NULL
         """)
         results = []
-        for event_id, name, date, start, end, building, room in cursor.fetchall():
-            if not date:
+        for event_id, name, event_date, start, end, building, room in cursor.fetchall():
+            if not event_date:
                 continue
 
             # Convert date to ISO string (YYYY-MM-DD)
-            if isinstance(date, datetime):
-                date_only = date.date()
+            if isinstance(event_date, datetime):
+                date_only = event_date.date()
             else:
-                date_only = date
+                date_only = event_date
 
             # Compose start datetime string combining date + time
             if start is None:
