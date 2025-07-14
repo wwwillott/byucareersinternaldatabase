@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Map Generator{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">📍 Generate Annotated Map</h2>
+
+<form method="POST" class="row g-3">
+  <div class="col-md-6">
+    <label for="building" class="form-label">Select Building:</label>
+    <select name="building" id="building" class="form-select" required>
+      <option value="">-- Choose --</option>
+      <option value="EB">EB</option>
+      <!-- Add more buildings as needed -->
+    </select>
+  </div>
+  <div class="col-md-6">
+    <label for="event_date" class="form-label">Select Date:</label>
+    <input type="date" name="event_date" id="event_date" class="form-control" required>
+  </div>
+  <div class="col-12 mt-3">
+    <button type="submit" class="btn btn-primary">Generate Map</button>
+  </div>
+</form>
+{% endblock %}

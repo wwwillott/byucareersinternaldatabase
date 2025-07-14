@@ -82,6 +82,14 @@
       transform: translateY(-50%) translateX(0);
     }
   </style>
+  <style>
+  td.truncate-cell {
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  </style>
 </head>
 <body>
   <div class="d-flex">
@@ -114,6 +122,12 @@
             <i class="bi bi-calendar-week"></i>
           </a>
           <span class="tooltip-text">Calendar</span>
+        </li>
+        <li class="tooltip-container">
+          <a href="{{ url_for('map_generator') }}" class="nav-link text-white">
+            <i class="bi bi-map"></i>
+          </a>
+          <span class="tooltip-text">Maps</span>
         </li>
       </ul>
       <hr>

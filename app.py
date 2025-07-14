@@ -1,9 +1,11 @@
-from flask import Flask, request, render_template, redirect, flash, session, Response, jsonify, url_for
+from flask import Flask, request, render_template, redirect, flash, session, Response, jsonify, url_for, send_file
 import pymssql  # uses easier connection than pyodbc
 from datetime import datetime, time, date
 import csv
 import io
 import json
+import os
+from PIL import Image, ImageDraw, ImageFont
 
 app = Flask(__name__)
 
@@ -900,6 +902,84 @@ def two_week_preview_events():
 def two_week_preview():
     return render_template('two_week_preview.html')
 
+# Map Builder
+room_coords = {
+    "EB": {
+        "101": (100, 150),  # Room 101 on EB_1.png
+        #200's
+        "201": (120, 180),  # Room 201 on EB_2.png
+        "224": (600, 675),  # Room 224 on EB_2.png
+        "246-6": (600, 675),  # also Room 224 on EB_2.png
+        "222": (700, 675),  # Room 222 on EB_2.png
+        "246-5": (700, 675),  # also Room 224 on EB_2.png
+        "246G": (1162, 308),  # Room 246G on EB_2.png
+        "246-4": (1162, 308),  # also Room 246G on EB_2.png
+        "246L": (1331,308),  # Room 246L on EB_2.png
+        "246-3": (1331,308),  # also Room 246L on EB_2.png
+        "246M": (1415, 308),  # Room 246M on EB_2.png
+        "246-2": (1415, 308),  # also Room 246M on EB_2.png
+        "246N": (1505, 308),  # Room 246N on EB_2.png
+        "246-1": (1505, 308),  # also Room 246N on EB_2.png
+    },
+}
+
+def annotate_map(map_path, room_employers, output_path, building):
+    img = Image.open(map_path).convert('RGB')
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.load_default()
+
+    for room, employer in room_employers:
+        coord = room_coords.get(building, {}).get(room)
+        if not coord:
+            continue
+
+        x, y = coord
+        r = 12  # highlight radius
+        draw.ellipse((x - r, y - r, x + r, y + r), fill='red')
+        draw.text((x + r + 2, y - r), employer, fill='black', font=font)
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    img.save(output_path, format='JPEG')
+
+@app.route('/map_generator', methods=['GET', 'POST'])
+def map_generator():
+    if request.method == 'POST':
+        building = request.form['building']
+        date_str = request.form['event_date']
+        event_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+
+        # Fetch events for the given building and date
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT Room, EmployerName, EventDate FROM InfoSessions WHERE Building = %s AND EventDate = %s", (building, event_date))
+        info_sessions = cursor.fetchall()
+
+        cursor.execute("SELECT Room, EmployerName, EventDate FROM Interviews WHERE Building = %s AND EventDate = %s", (building, event_date))
+        interviews = cursor.fetchall()
+        conn.close()
+
+        # Merge both event lists
+        events = info_sessions + interviews
+
+        # Group events by floor
+        from collections import defaultdict
+        floor_map = defaultdict(list)
+        for room, employer, _ in events:
+            floor = int(room[0])
+            floor_map[floor].append((room, employer))
+
+        generated_paths = []
+        for floor, floor_events in floor_map.items():
+            map_path = f'static/maps/{building}_{floor}.png'
+            out_path = f'static/generated/{building}_{floor}_{event_date}.jpg'
+
+            annotate_map(map_path, floor_events, out_path, building)
+
+            generated_paths.append(out_path)
+
+        return render_template('map_result.html', image_paths=generated_paths, building=building, event_date=event_date)
+    
+    return render_template('map_form.html')
 
 
 # Fun stuff

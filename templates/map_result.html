@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Generated Maps{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">🗺️ Maps for {{ building }} on {{ event_date }}</h2>
+
+{% if image_paths %}
+  {% for path in image_paths %}
+    <div class="mb-5">
+      <h5 class="mb-2">{{ path.split('/')[-1] }}</h5>
+      <img src="{{ url_for('static', filename=path.split('static/')[-1]) }}" class="img-fluid rounded shadow border">
+      <a href="{{ url_for('static', filename=path.split('static/')[-1]) }}" download class="btn btn-success mt-2">Download Map</a>
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="alert alert-warning">No events found for this building and date.</div>
+{% endif %}
+{% endblock %}
