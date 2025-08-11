@@ -931,7 +931,10 @@ def format_time_range_filter(event):
 @app.route('/two_week_preview')
 def two_week_preview():
     conn = get_connection()
-    major_group_filter = request.args.get('major_group', None)  # get filter from query string
+    
+    major_group_str = request.args.get('major_group', '')
+    major_groups = [g.strip() for g in major_group_str.split(',') if g.strip()] if major_group_str else []
+
 
     today = datetime.utcnow().date()
     two_weeks_later = today + timedelta(days=13)  # 14 days including today means 0..13 days after today
@@ -944,9 +947,9 @@ def two_week_preview():
     """
     params = [today, two_weeks_later]
 
-    if major_group_filter:
-        sql += " AND MajorGroup LIKE %s"
-        params.append(f"%{major_group_filter}%")  # Use LIKE for partial matches
+    if major_groups:
+        sql += " AND (" + " OR ".join(["MajorGroup LIKE %s"] * len(major_groups)) + ")"
+        params.extend([f"%{mg}%" for mg in major_groups])  
 
     with conn.cursor() as cur:
         cur.execute(sql, params)
@@ -965,11 +968,18 @@ def two_week_preview():
         # You might want to skip weekends here if you want strictly Mon-Fri only,
         # or filter in the template (you currently show only 5 days each week)
 
+    color_map = {
+        'CivilandConstruction': "#eb833e",
+        'Mathematics': '#2196f3',
+        # add your other major groups here
+    }
+
     return render_template(
         'two_week_preview.html',
         events=events_dicts,
-        major_group=major_group_filter,
-        days=days
+        major_group=major_groups,
+        days=days,
+        color_map=color_map
     )
 
 

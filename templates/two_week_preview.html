@@ -5,28 +5,56 @@
 <h2 class="text-center mb-4">Two Week Preview</h2>
 
 <div class="text-center mb-3">
-  <label for="majorGroupFilter">Filter by Major Group:</label>
-  <select id="majorGroupFilter" class="form-select d-inline-block w-auto" onchange="onFilterChange()">
-    <option value="">All</option>
-    <option value="Civil and Construction" {% if major_group == 'Civil and Construction' %}selected{% endif %}>Civil and Construction</option>
-    <option value="Mathematics" {% if major_group == 'Mathematics' %}selected{% endif %}>Mathematics</option>
-    <option value="Engineering" {% if major_group == 'Engineering' %}selected{% endif %}>Engineering</option>
-    <!-- Add more options as needed and change dictionary below-->
-  </select>
+  <label for="majorGroupFilterDropdown" class="form-label">Filter by Major Group:</label>
+  <div class="dropdown d-inline-block">
+    <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="majorGroupFilterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+      Select Major Groups
+    </button>
+    <form class="dropdown-menu p-3" aria-labelledby="majorGroupFilterDropdown" id="majorGroupFilterForm">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" value="Civil and Construction" id="majorCivil" name="major_group"
+          {% if 'Civil and Construction' in major_groups %}checked{% endif %}>
+        <label class="form-check-label" for="majorCivil">Civil and Construction</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" value="Mathematics" id="majorMath" name="major_group"
+          {% if 'Mathematics' in major_groups %}checked{% endif %}>
+        <label class="form-check-label" for="majorMath">Mathematics</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" value="Engineering" id="majorEng" name="major_group"
+          {% if 'Engineering' in major_groups %}checked{% endif %}>
+        <label class="form-check-label" for="majorEng">Engineering</label>
+      </div>
+      <!-- Add more checkboxes as needed -->
+      <button type="button" class="btn btn-primary btn-sm mt-2" onclick="applyFilter()">Apply</button>
+    </form>
+  </div>
 </div>
 
-{% set display_names = {
-  "Civil and Construction": "Civil and Construction",
-  "Mathematics": "Mathematics",
-  "Engineering": "Engineering"
-} %}
+<script>
+  function applyFilter() {
+    const checkboxes = document.querySelectorAll('#majorGroupFilterForm input[name="major_group"]:checked');
+    const selected = Array.from(checkboxes).map(cb => cb.value);
+    const url = new URL(window.location);
+
+    if (selected.length > 0) {
+      url.searchParams.set('major_group', selected.join(','));
+    } else {
+      url.searchParams.delete('major_group');
+    }
+
+    window.location = url.toString();
+  }
+</script>
 
 <script>
   function onFilterChange() {
-    const filter = document.getElementById('majorGroupFilter').value;
+    const select = document.getElementById('majorGroupFilter');
+    const selected = Array.from(select.selectedOptions).map(o => o.value);
     const url = new URL(window.location);
-    if (filter) {
-      url.searchParams.set('major_group', filter);
+    if (selected.length > 0) {
+      url.searchParams.set('major_group', selected.join(','));
     } else {
       url.searchParams.delete('major_group');
     }
@@ -51,32 +79,23 @@
       border-radius: 6px;
       background: #c9e2ff;
     }
-    .week-box h3 {
+    .week-box h3, .week-box-sad h3 {
       margin-top: 0;
       border-bottom: 1px solid #ddd;
       padding-bottom: 0.5rem;
     }
     .week-box-sad h3 {
-      margin-top: 0;
-      border-bottom: 1px solid #7e7e7e;
-      padding-bottom: 0.5rem;
+      border-color: #7e7e7e;
     }
     .event-row {
     display: grid;
-    grid-template-columns: 1fr 1.5fr 3fr 2fr 2fr; /* last column uses 2fr too */
-    /* 
-    Columns:
-    - Weekday/Date: 1fr (smaller)
-    - Type: 1.5fr
-    - Company: 3fr
-    - Time: 2fr
-    - Location: 2fr
-    */
+    grid-template-columns: 1fr 1.5fr 3fr 2fr 2fr;
+    /* Columns: Weekday/Date | Type | Company | Time | Location */
     gap: 10px;
     padding: 6px 0;
     border-bottom: 1px solid #eee;
     align-items: center;
-    white-space: nowrap; /* prevent wrapping */
+    white-space: nowrap;
   }
   .event-row:last-child {
     border-bottom: none;
@@ -84,18 +103,39 @@
   .event-cell {
     overflow: visible;
     text-overflow: clip;
-    white-space: nowrap; /* prevents wrapping */
-  }
-  .event-cell.date {
-    flex: 1.2;
+    white-space: nowrap;
   }
   .event-cell.company {
-    flex: 2;
+    display: flex;
+    align-items: center;
   }
+
+  /* Color coding for major groups */
+  .event-color-marker {
+    width: 12px;
+    height: 12px;
+    display: inline-block;
+    margin-right: 6px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .color-Civil_and_Construction { background-color: #ffd700; }  /* gold */
+  .color-Mathematics { background-color: #1e90ff; }            /* dodger blue */
+  .color-Engineering { background-color: #32cd32; }            /* lime green */
 </style>
 
+{% set major_group_colors = {
+  "Civil and Construction": "color-Civil_and_Construction",
+  "Mathematics": "color-Mathematics",
+  "Engineering": "color-Engineering"
+} %}
+
 <h2 class="text-center mb-3">
-  {{ display_names.get(major_group, "All") }} Events
+  {% if major_groups %}
+    {{ major_groups }} Events
+  {% else %}
+    All Events
+  {% endif %}
 </h2>
 
 <div class="week-box-sad">
@@ -115,7 +155,18 @@
             Info Session
           {% endif %}
         </div>
-        <div class="event-cell company"><strong>{{ event.Company or event.EmployerName or '' }}</strong></div>
+        <div class="event-cell company">
+          {% set groups = event.MajorGroup.split(',') if event.MajorGroup else [] %}
+          {% set color_class = '' %}
+          {% for g in groups %}
+            {% set g_trim = g.strip() %}
+            {% if g_trim in major_group_colors %}
+              {% set color_class = major_group_colors[g_trim] %}
+            {% endif %}
+          {% endfor %}
+          <span class="event-color-marker {{ color_class }}"></span>
+          <strong>{{ event.Company or event.EmployerName or '' }}</strong>
+        </div>
         <div class="event-cell">{{ event | format_time_range }}</div>
         <div class="event-cell">{{ event.Location or event.Building ~ ' ' ~ event.Room }}</div>
       </div>
@@ -140,7 +191,18 @@
             Info Session
           {% endif %}
         </div>
-        <div class="event-cell company"><strong>{{ event.Company or event.EmployerName or '' }}</strong></div>
+        <div class="event-cell company">
+          {% set groups = event.MajorGroup.split(',') if event.MajorGroup else [] %}
+          {% set color_class = '' %}
+          {% for g in groups %}
+            {% set g_trim = g.strip() %}
+            {% if g_trim in major_group_colors %}
+              {% set color_class = major_group_colors[g_trim] %}
+            {% endif %}
+          {% endfor %}
+          <span class="event-color-marker {{ color_class }}"></span>
+          <strong>{{ event.Company or event.EmployerName or '' }}</strong>
+        </div>
         <div class="event-cell">{{ event | format_time_range }}</div>
         <div class="event-cell">{{ event.Location or event.Building ~ ' ' ~ event.Room }}</div>
       </div>
