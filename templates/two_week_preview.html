@@ -8,15 +8,17 @@
   <label for="majorGroupFilter">Filter by Major Group:</label>
   <select id="majorGroupFilter" class="form-select d-inline-block w-auto" onchange="onFilterChange()">
     <option value="">All</option>
-    <option value="CivilandConstruction" {% if major_group == 'CivilandConstruction' %}selected{% endif %}>Civil and Construction</option>
+    <option value="Civil and Construction" {% if major_group == 'Civil and Construction' %}selected{% endif %}>Civil and Construction</option>
     <option value="Mathematics" {% if major_group == 'Mathematics' %}selected{% endif %}>Mathematics</option>
+    <option value="Engineering" {% if major_group == 'Engineering' %}selected{% endif %}>Engineering</option>
     <!-- Add more options as needed and change dictionary below-->
   </select>
 </div>
 
 {% set display_names = {
-  "CivilandConstruction": "Civil and Construction",
-  "Mathematics": "Mathematics"
+  "Civil and Construction": "Civil and Construction",
+  "Mathematics": "Mathematics",
+  "Engineering": "Engineering"
 } %}
 
 <script>
@@ -41,9 +43,22 @@
       border-radius: 6px;
       background: #fefefe;
     }
+  .week-box-sad {
+      max-width: 1000px;
+      margin: 1.5rem auto;
+      padding: 1rem;
+      border: 1px solid #7e7e7e;
+      border-radius: 6px;
+      background: #c9e2ff;
+    }
     .week-box h3 {
       margin-top: 0;
       border-bottom: 1px solid #ddd;
+      padding-bottom: 0.5rem;
+    }
+    .week-box-sad h3 {
+      margin-top: 0;
+      border-bottom: 1px solid #7e7e7e;
       padding-bottom: 0.5rem;
     }
     .event-row {
@@ -83,7 +98,7 @@
   {{ display_names.get(major_group, "All") }} Events
 </h2>
 
-<div class="week-box">
+<div class="week-box-sad">
   <h3>This Week</h3>
   {% for event in events %}
     {% set event_date = event.EventDate | todatetime %}

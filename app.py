@@ -945,8 +945,8 @@ def two_week_preview():
     params = [today, two_weeks_later]
 
     if major_group_filter:
-        sql += " AND MajorGroup = %s"
-        params.append(major_group_filter)
+        sql += " AND MajorGroup LIKE %s"
+        params.append(f"%{major_group_filter}%")  # Use LIKE for partial matches
 
     with conn.cursor() as cur:
         cur.execute(sql, params)
