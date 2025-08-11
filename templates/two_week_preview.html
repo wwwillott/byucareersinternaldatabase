@@ -1,5 +1,3 @@
-<!-- File: templates/two_week_preview.html -->
-<!-- This file may be retired shortly. -->
 {% extends "base.html" %}
 {% block title %}Two Week Preview{% endblock %}
 {% block content %}
@@ -8,95 +6,131 @@
 
 <div class="text-center mb-3">
   <label for="majorGroupFilter">Filter by Major Group:</label>
-  <select id="majorGroupFilter" class="form-select d-inline-block w-auto">
+  <select id="majorGroupFilter" class="form-select d-inline-block w-auto" onchange="onFilterChange()">
     <option value="">All</option>
-    <option value="CivilandConstruction">Civil and Construction</option>
-    <option value="Mathematics">Mathematics</option>
-    <!-- Add more options as needed -->
+    <option value="CivilandConstruction" {% if major_group == 'CivilandConstruction' %}selected{% endif %}>Civil and Construction</option>
+    <option value="Mathematics" {% if major_group == 'Mathematics' %}selected{% endif %}>Mathematics</option>
+    <!-- Add more options as needed and change dictionary below-->
   </select>
 </div>
 
-<div id="calendar"></div>
+{% set display_names = {
+  "CivilandConstruction": "Civil and Construction",
+  "Mathematics": "Mathematics"
+} %}
+
+<script>
+  function onFilterChange() {
+    const filter = document.getElementById('majorGroupFilter').value;
+    const url = new URL(window.location);
+    if (filter) {
+      url.searchParams.set('major_group', filter);
+    } else {
+      url.searchParams.delete('major_group');
+    }
+    window.location = url.toString();
+  }
+</script>
 
 <style>
-  #calendar {
-    max-width: 1100px;
-    margin: 2rem auto;
-    background-color: white;
-    padding: 1rem;
-    border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  .week-box {
+      max-width: 1000px;
+      margin: 1.5rem auto;
+      padding: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fefefe;
+    }
+    .week-box h3 {
+      margin-top: 0;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 0.5rem;
+    }
+    .event-row {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr 3fr 2fr 2fr; /* last column uses 2fr too */
+    /* 
+    Columns:
+    - Weekday/Date: 1fr (smaller)
+    - Type: 1.5fr
+    - Company: 3fr
+    - Time: 2fr
+    - Location: 2fr
+    */
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid #eee;
+    align-items: center;
+    white-space: nowrap; /* prevent wrapping */
+  }
+  .event-row:last-child {
+    border-bottom: none;
+  }
+  .event-cell {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap; /* prevents wrapping */
+  }
+  .event-cell.date {
+    flex: 1.2;
+  }
+  .event-cell.company {
+    flex: 2;
   }
 </style>
 
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const calendarEl = document.getElementById('calendar');
-    const groupFilter = document.getElementById('majorGroupFilter');
+<h2 class="text-center mb-3">
+  {{ display_names.get(major_group, "All") }} Events
+</h2>
 
-    const calendar = new FullCalendar.Calendar(calendarEl, {
-      initialView: 'timeGridWeek',
-      weekends: false,
-      slotMinTime: "06:00:00",
-      slotMaxTime: "22:00:00",
-      headerToolbar: {
-        left: 'prev,next today',
-        center: 'title',
-        right: ''
-      },
-      visibleRange: function(currentDate) {
-        let day = currentDate.getDay();
-        let diffToMonday = (day === 0 ? -6 : 1) - day;
+<div class="week-box">
+  <h3>This Week</h3>
+  {% for event in events %}
+    {% set event_date = event.EventDate | todatetime %}
+    {% if event_date >= days[0] and event_date <= days[4] %}
+      <div class="event-row">
+        <div class="event-cell date">{{ event_date.strftime('%a, %b %d') }}</div>
+        <div class="event-cell">
+          {% set company_name = event.Company or event.EmployerName or '' %}
+          {% if 'Fair' in company_name %}
+            Fair
+          {% elif 'Tabling' in company_name %}
+            Tabling
+          {% else %}
+            Info Session
+          {% endif %}
+        </div>
+        <div class="event-cell company"><strong>{{ event.Company or event.EmployerName or '' }}</strong></div>
+        <div class="event-cell">{{ event | format_time_range }}</div>
+        <div class="event-cell">{{ event.Location or event.Building ~ ' ' ~ event.Room }}</div>
+      </div>
+    {% endif %}
+  {% endfor %}
+</div>
 
-        let monday = new Date(currentDate);
-        monday.setDate(currentDate.getDate() + diffToMonday);
-
-        // Add 14 days from Monday for a full 2-week period
-        let end = new Date(monday);
-        end.setDate(monday.getDate() + 14);
-
-        return {
-          start: monday.toISOString().split('T')[0],
-          end: end.toISOString().split('T')[0]
-        };
-      },
-      events: function(fetchInfo, successCallback, failureCallback) {
-        const group = groupFilter.value;
-        const params = new URLSearchParams();
-
-        params.append('start', fetchInfo.startStr);
-        params.append('end', fetchInfo.endStr);
-        if (group) {
-          params.append('major_group', group);
-        }
-
-        fetch(`/two_week_preview_events?${params.toString()}`)
-          .then(response => response.json())
-          .then(data => {
-            console.log("✅ Events fetched:", data.events);
-            successCallback(data.events);  // NOTE: data.events, not just data
-          })
-          .catch(error => {
-            console.error("❌ Error fetching events:", error);
-            failureCallback(error);
-          });
-      },
-      eventClick: function(info) {
-        const link = info.event.extendedProps.link;
-        if (link) {
-          window.open(link, "_blank");
-        } else {
-          alert('Event: ' + info.event.title);
-        }
-      }
-    });
-
-    calendar.render();
-
-    groupFilter.addEventListener('change', () => {
-      calendar.refetchEvents();
-    });
-  });
-</script>
+<div class="week-box">
+  <h3>Next Week</h3>
+  {% for event in events %}
+    {% set event_date = event.EventDate | todatetime %}
+    {% if event_date >= days[5] and event_date <= days[9] %}
+      <div class="event-row">
+        <div class="event-cell date">{{ event_date.strftime('%a, %b %d') }}</div>
+        <div class="event-cell">
+          {% set company_name = event.Company or event.EmployerName or '' %}
+          {% if 'Fair' in company_name %}
+            Fair
+          {% elif 'Tabling' in company_name %}
+            Tabling
+          {% else %}
+            Info Session
+          {% endif %}
+        </div>
+        <div class="event-cell company"><strong>{{ event.Company or event.EmployerName or '' }}</strong></div>
+        <div class="event-cell">{{ event | format_time_range }}</div>
+        <div class="event-cell">{{ event.Location or event.Building ~ ' ' ~ event.Room }}</div>
+      </div>
+    {% endif %}
+  {% endfor %}
+</div>
 
 {% endblock %}
