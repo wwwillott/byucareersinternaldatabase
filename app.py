@@ -896,9 +896,93 @@ def two_week_preview_events():
     conn.close()
     return jsonify(events=events)
 
+from flask import request, render_template
+from datetime import datetime, timedelta
+
+@app.template_filter('todatetime')
+def to_datetime_filter(value):
+    if isinstance(value, str):
+        try:
+            return datetime.strptime(value, '%Y-%m-%d').date()
+        except Exception:
+            return value
+    return value
+
+@app.template_filter('format_time_range')
+def format_time_range_filter(event):
+    start = getattr(event, 'StartTime', None) or event.get('StartTime')
+    end = getattr(event, 'EndTime', None) or event.get('EndTime')
+    if not start or not end:
+        return ""
+
+    # Parse times, assuming HH:MM:SS format
+    try:
+        start_dt = datetime.strptime(str(start), "%H:%M:%S")
+        end_dt = datetime.strptime(str(end), "%H:%M:%S")
+    except Exception:
+        return ""
+
+    # Format as "1:30 PM - 3:00 PM"
+    start_fmt = start_dt.strftime("%I:%M %p")  # %-I for no leading zero on hour (Linux/Mac)
+    end_fmt = end_dt.strftime("%I:%M %p")
+
+    return f"{start_fmt} - {end_fmt}"
+
 @app.route('/two_week_preview')
 def two_week_preview():
-    return render_template('two_week_preview.html')
+    conn = get_connection()
+    
+    major_group_str = request.args.get('major_group', '')
+    major_groups = [g.strip() for g in major_group_str.split(',') if g.strip()] if major_group_str else []
+
+
+    today = datetime.utcnow().date()
+    two_weeks_later = today + timedelta(days=13)  # 14 days including today means 0..13 days after today
+
+    # Base SQL and params
+    sql = """
+        SELECT *
+        FROM InfoSessions
+        WHERE EventDate >= %s AND EventDate <= %s
+    """
+    params = [today, two_weeks_later]
+
+    if major_groups:
+        sql += " AND (" + " OR ".join(["MajorGroup LIKE %s"] * len(major_groups)) + ")"
+        params.extend([f"%{mg}%" for mg in major_groups])  
+
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        events = cur.fetchall()
+        colnames = [desc[0] for desc in cur.description]
+
+    events_dicts = [dict(zip(colnames, row)) for row in events]
+
+    # Generate list of 10 weekdays: Mon-Fri this week + Mon-Fri next week
+    days = []
+    # find Monday of current week (ISO weekday: Monday=1)
+    weekday = today.isoweekday()
+    monday = today - timedelta(days=weekday-1)
+    for i in range(10):
+        days.append(monday + timedelta(days=i))
+        # You might want to skip weekends here if you want strictly Mon-Fri only,
+        # or filter in the template (you currently show only 5 days each week)
+
+    color_map = {
+        'CivilandConstruction': "#eb833e",
+        'Mathematics': '#2196f3',
+        # add your other major groups here
+    }
+
+    return render_template(
+        'two_week_preview.html',
+        events=events_dicts,
+        major_group=major_groups,
+        days=days,
+        color_map=color_map
+    )
+
+
 
 
 
