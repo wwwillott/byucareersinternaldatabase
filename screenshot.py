@@ -6,7 +6,7 @@ async def capture():
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page(viewport={"width": 1400, "height": 1000})
         await page.goto(
-            'http://127.0.0.1:5000/two_week_preview?major_group=Mathematics',
+            'https://byucareersinternaldatabase.onrender.com',
             wait_until="networkidle"  # waits until network is quiet
         )
         await page.wait_for_selector(".week-box")  # waits for content to render
